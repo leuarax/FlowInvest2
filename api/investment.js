@@ -42,12 +42,19 @@ module.exports = async (req, res) => {
       temperature: 0.7,
     });
 
-    const response = JSON.parse(completion.choices[0].message.content);
-    res.status(200).json({
-      ...response,
-      riskScore: Math.round(response.riskScore),
-      roiEstimate: parseFloat(response.roiEstimate.toFixed(2))
-    });
+    try {
+      const response = JSON.parse(completion.choices[0].message.content);
+      res.status(200).json({
+        ...response,
+        riskScore: Math.round(response.riskScore),
+        roiEstimate: parseFloat(response.roiEstimate.toFixed(2))
+      });
+    } catch (parseError) {
+      console.error('Error parsing AI response:', parseError);
+      res.status(500).json({
+        error: 'Failed to parse AI response. Please try again.'
+      });
+    }
   } catch (error) {
     console.error('Error analyzing investment:', error);
     res.status(500).json({ error: 'Failed to analyze investment' });

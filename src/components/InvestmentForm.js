@@ -70,9 +70,6 @@ const InvestmentForm = () => {
     }
   };
 
-    }
-  };
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Typography variant="h1" component="h1" sx={{ mb: 4 }}>

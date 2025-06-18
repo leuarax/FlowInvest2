@@ -4,15 +4,23 @@
     {
       "src": "package.json",
       "use": "@vercel/static-build"
+    },
+    {
+      "src": "api/investment.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "/index.html"
     }
   ],
   "env": {
-    "REACT_APP_OPENAI_API_KEY": "your-api-key-here"
+    "OPENAI_API_KEY": "your-api-key-here"
   }
 }
