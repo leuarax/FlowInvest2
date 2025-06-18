@@ -1,14 +1,64 @@
 const OpenAI = require('openai');
 
+// Log environment variables (except sensitive ones)
+console.log('Environment variables available:');
+console.log(Object.keys(process.env));
+
+// Check if API key exists
 if (!process.env.OPENAI_API_KEY) {
   console.error('Error: OPENAI_API_KEY is not set');
-  return process.exit(1);
+  console.log('Available environment variables:', Object.keys(process.env));
+  return res.status(500).json({ 
+    error: 'OpenAI API key not configured',
+    details: 'OPENAI_API_KEY environment variable is not set'
+  });
 }
 
+// Validate API key format
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey.startsWith('sk-')) {
+  console.error('Error: Invalid API key format');
+  console.log('API key:', apiKey);
+  return res.status(500).json({ 
+    error: 'Invalid API key format',
+    details: 'API key should start with "sk-"'
+  });
+}
+
+// Initialize OpenAI with logging
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: apiKey,
+  baseURL: 'https://api.openai.com/v1'
 });
 
+// Test API key by making a simple request
+async function testApiKey() {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: "Test API key" }],
+      temperature: 0.7,
+      max_tokens: 10
+    });
+    console.log('API key test successful');
+    console.log('Response:', response);
+    return true;
+  } catch (error) {
+    console.error('API key test failed:', error);
+    return false;
+  }
+}
+
+// Test the API key before proceeding
+const apiKeyValid = await testApiKey();
+if (!apiKeyValid) {
+  return res.status(500).json({ 
+    error: 'Invalid API key',
+    details: 'Failed to authenticate with OpenAI'
+  });
+}
+
+// Continue with the main export
 module.exports = async (req, res) => {
   try {
     console.log('Received investment analysis request');
