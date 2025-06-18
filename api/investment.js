@@ -1,16 +1,16 @@
 const OpenAI = require('openai');
 
 // Log environment variables (except sensitive ones)
-console.log('Environment variables available:');
-console.log(Object.keys(process.env));
+console.log('Environment variables available:', Object.keys(process.env));
 
 // Check if API key exists
 if (!process.env.OPENAI_API_KEY) {
   console.error('Error: OPENAI_API_KEY is not set');
-  console.log('Available environment variables:', Object.keys(process.env));
+  console.log('Available environment variables:', process.env);
   return res.status(500).json({ 
     error: 'OpenAI API key not configured',
-    details: 'OPENAI_API_KEY environment variable is not set'
+    details: 'OPENAI_API_KEY environment variable is not set',
+    availableEnvVars: Object.keys(process.env)
   });
 }
 
@@ -21,7 +21,8 @@ if (!apiKey.startsWith('sk-')) {
   console.log('API key:', apiKey);
   return res.status(500).json({ 
     error: 'Invalid API key format',
-    details: 'API key should start with "sk-"'
+    details: 'API key should start with "sk-"',
+    apiKeyStart: apiKey.substring(0, 5)
   });
 }
 
@@ -34,6 +35,7 @@ const openai = new OpenAI({
 // Test API key by making a simple request
 async function testApiKey() {
   try {
+    console.log('Testing API key with OpenAI...');
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [{ role: "user", content: "Test API key" }],
@@ -45,16 +47,27 @@ async function testApiKey() {
     return true;
   } catch (error) {
     console.error('API key test failed:', error);
-    return false;
+    console.error('Error details:', error.message);
+    console.error('Stack trace:', error.stack);
+    throw error;
   }
 }
 
 // Test the API key before proceeding
-const apiKeyValid = await testApiKey();
-if (!apiKeyValid) {
+try {
+  const apiKeyValid = await testApiKey();
+  if (!apiKeyValid) {
+    return res.status(500).json({ 
+      error: 'Invalid API key',
+      details: 'Failed to authenticate with OpenAI'
+    });
+  }
+} catch (error) {
+  console.error('API key validation failed:', error);
   return res.status(500).json({ 
-    error: 'Invalid API key',
-    details: 'Failed to authenticate with OpenAI'
+    error: 'API key validation failed',
+    details: error.message,
+    stack: error.stack
   });
 }
 
