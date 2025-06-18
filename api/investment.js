@@ -1,7 +1,8 @@
 const OpenAI = require('openai');
 
 if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY environment variable is not set');
+  console.error('Error: OPENAI_API_KEY is not set');
+  return process.exit(1);
 }
 
 const openai = new OpenAI({
@@ -10,15 +11,22 @@ const openai = new OpenAI({
 
 module.exports = async (req, res) => {
   try {
+    console.log('Received investment analysis request');
+    console.log('Request body:', req.body);
+    
     if (!req.body) {
+      console.error('Error: No request body received');
       return res.status(400).json({ error: 'Request body is required' });
     }
+    
     const { investmentData, userProfile } = req.body;
 
     if (!investmentData || !userProfile) {
+      console.error('Error: Missing required data');
       return res.status(400).json({ error: 'Missing required data' });
     }
     
+    console.log('Generating prompt for investment analysis');
     const prompt = `
       Analyze the following investment based on the user's profile:
       
@@ -47,27 +55,56 @@ module.exports = async (req, res) => {
       }
     `;
 
+    console.log('Sending request to OpenAI');
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: "You are a financial analyst that provides investment analysis." },
+        { role: "user", content: prompt }
+      ],
       temperature: 0.7,
+      max_tokens: 1000
     });
 
+    console.log('Received OpenAI response');
+    const responseText = completion.choices[0].message.content;
+    console.log('Raw response:', responseText);
+
+    // Parse the JSON response
+    let analysis;
     try {
-      const response = JSON.parse(completion.choices[0].message.content);
-      res.status(200).json({
-        ...response,
-        riskScore: Math.round(response.riskScore),
-        roiEstimate: parseFloat(response.roiEstimate.toFixed(2))
-      });
+      analysis = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Error parsing AI response:', parseError);
-      res.status(500).json({
-        error: 'Failed to parse AI response. Please try again.'
-      });
+      console.error('Error parsing OpenAI response:', parseError);
+      // If parsing fails, try to extract the JSON manually
+      const jsonMatch = responseText.match(/\{.*\}/s);
+      if (jsonMatch) {
+        try {
+          analysis = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          console.error('Failed to parse extracted JSON:', e);
+          return res.status(500).json({ 
+            error: 'Failed to parse analysis response',
+            rawResponse: responseText,
+            extractedJson: jsonMatch[0]
+          });
+        }
+      } else {
+        return res.status(500).json({ 
+          error: 'Failed to parse analysis response',
+          rawResponse: responseText
+        });
+      }
     }
+
+    console.log('Successfully parsed analysis:', analysis);
+    return res.json(analysis);
+
   } catch (error) {
-    console.error('Error analyzing investment:', error);
-    res.status(500).json({ error: 'Failed to analyze investment' });
+    console.error('Error in investment analysis:', error);
+    return res.status(500).json({ 
+      error: 'Failed to analyze investment',
+      details: error.message
+    });
   }
 };
