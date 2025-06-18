@@ -20,7 +20,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy": "vercel"
   },
   "eslintConfig": {
     "extends": [
@@ -30,13 +31,6 @@
   },
   "devDependencies": {
     "vercel": "^35.0.0"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "deploy": "vercel"
   },
   "vercel": {
     "env": {
