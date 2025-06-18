@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '@mui/material/styles';
-import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress, IconButton } from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
+// import { useTheme } from '@mui/material/styles';
+import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress } from '@mui/material';
 import { getInvestmentAnalysis } from '../utils/openai';
 
 const investmentTypes = [
@@ -14,7 +13,7 @@ const investmentTypes = [
 
 const InvestmentForm = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
+// const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [formData, setFormData] = useState({
@@ -24,6 +23,15 @@ const InvestmentForm = () => {
     duration: '',
     date: '',
   });
+
+  const handleSaveInvestment = () => {
+    const investments = JSON.parse(localStorage.getItem('investments') || '[]');
+    localStorage.setItem('investments', JSON.stringify([
+      ...investments,
+      { ...formData, ...analysis },
+    ]));
+    navigate('/dashboard');
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -62,20 +70,12 @@ const InvestmentForm = () => {
     }
   };
 
-  const handleDeleteInvestment = (investment) => {
-    if (window.confirm('Are you sure you want to delete this investment?')) {
-      const investments = JSON.parse(localStorage.getItem('investments') || '[]');
-      const updatedInvestments = investments.filter(
-        inv => inv.name !== investment.name || inv.type !== investment.type || inv.date !== investment.date
-      );
-      localStorage.setItem('investments', JSON.stringify(updatedInvestments));
-      navigate('/dashboard');
     }
   };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Typography variant="h1" component="h1" sx={{ mb: 4, color: theme.palette.primary.main }}>
+      <Typography variant="h1" component="h1" sx={{ mb: 4 }}>
         FlowInvest
       </Typography>
       <Grid container spacing={4}>
@@ -210,15 +210,7 @@ const InvestmentForm = () => {
                   variant="contained"
                   color="primary"
                   size="large"
-                  onClick={() => {
-                    const userProfile = JSON.parse(localStorage.getItem('userProfile'));
-                    const investments = JSON.parse(localStorage.getItem('investments') || '[]');
-                    localStorage.setItem('investments', JSON.stringify([
-                      ...investments,
-                      { ...formData, ...analysis },
-                    ]));
-                    navigate('/dashboard');
-                  }}
+                  onClick={handleSaveInvestment}
                   sx={{
                     mt: 3,
                     backgroundColor: theme.palette.primary.main,

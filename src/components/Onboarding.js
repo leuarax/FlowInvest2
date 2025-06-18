@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Button,
@@ -9,15 +9,12 @@ import {
   RadioGroup,
   FormControlLabel,
   FormControl,
-  FormLabel,
   CircularProgress,
-  useTheme,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
