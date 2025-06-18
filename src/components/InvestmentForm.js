@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { useTheme } from '@mui/material/styles';
+// // import { useTheme } from '@mui/material/styles';
 import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress } from '@mui/material';
 import { getInvestmentAnalysis } from '../utils/openai';
 
@@ -212,7 +212,7 @@ const InvestmentForm = () => {
                 </Button>
               </Box>
             ) : (
-              <Typography variant="body1" sx={{ color: theme.palette.text.secondary }}>
+              <Typography variant="body1" sx={{ color: 'text.secondary' }}>
                 Click "Get AI Assessment" to analyze your investment
               </Typography>
             )}
