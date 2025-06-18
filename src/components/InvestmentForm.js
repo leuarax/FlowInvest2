@@ -146,10 +146,6 @@ const InvestmentForm = () => {
                 disabled={loading || !formData.type || !formData.name || !formData.amount || !formData.duration || !formData.date}
                 sx={{
                   mt: 2,
-                  backgroundColor: theme.palette.primary.main,
-                  '&:hover': {
-                    backgroundColor: theme.palette.primary.dark,
-                  },
                 }}
               >
                 {loading ? <CircularProgress size={24} /> : 'Get AI Assessment'}
@@ -176,7 +172,7 @@ const InvestmentForm = () => {
                       sx={{
                         width: '100%',
                         height: 8,
-                        backgroundColor: theme.palette.grey[200],
+                        backgroundColor: 'grey.200',
                         borderRadius: 2,
                       }}
                     >
@@ -184,7 +180,7 @@ const InvestmentForm = () => {
                         sx={{
                           width: `${(analysis.riskScore / 10) * 100}%`,
                           height: '100%',
-                          backgroundColor: analysis.riskScore > 5 ? theme.palette.error.main : theme.palette.success.main,
+                          backgroundColor: analysis.riskScore > 5 ? 'error.main' : 'success.main',
                           borderRadius: 2,
                         }}
                       />
@@ -200,7 +196,7 @@ const InvestmentForm = () => {
                 <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
                   Analysis Explanation
                 </Typography>
-                <Typography variant="body2" sx={{ color: theme.palette.text.secondary }}>
+                <Typography sx={{ color: 'text.secondary' }}>
                   {analysis.explanation}
                 </Typography>
                 <Button
@@ -210,10 +206,6 @@ const InvestmentForm = () => {
                   onClick={handleSaveInvestment}
                   sx={{
                     mt: 3,
-                    backgroundColor: theme.palette.primary.main,
-                    '&:hover': {
-                      backgroundColor: theme.palette.primary.dark,
-                    },
                   }}
                 >
                   Save Investment

@@ -1,12 +1,23 @@
 const OpenAI = require('openai');
+
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable is not set');
+}
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 module.exports = async (req, res) => {
   try {
+    if (!req.body) {
+      return res.status(400).json({ error: 'Request body is required' });
+    }
     const { investmentData, userProfile } = req.body;
+
+    if (!investmentData || !userProfile) {
+      return res.status(400).json({ error: 'Missing required data' });
+    }
     
     const prompt = `
       Analyze the following investment based on the user's profile:

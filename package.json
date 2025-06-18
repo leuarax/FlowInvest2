@@ -34,9 +34,7 @@
   "devDependencies": {
     "vercel": "^35.0.0"
   },
-  "vercel": {
-    "env": {}
-  },
+
   "browserslist": {
     "production": [
       ">0.2%",
