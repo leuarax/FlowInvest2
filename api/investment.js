@@ -1,29 +1,24 @@
 const OpenAI = require('openai');
 
+// Get API key from environment variables
+const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
+
 // Log environment variables (except sensitive ones)
 console.log('Environment variables available:', Object.keys(process.env));
+console.log('API key source:', apiKey ? 'Available' : 'Not found');
 
 // Check if API key exists
-if (!process.env.OPENAI_API_KEY) {
-  console.error('Error: OPENAI_API_KEY is not set');
+if (!apiKey) {
+  console.error('Error: No API key found in environment variables');
   console.log('Available environment variables:', process.env);
-  return res.status(500).json({ 
-    error: 'OpenAI API key not configured',
-    details: 'OPENAI_API_KEY environment variable is not set',
-    availableEnvVars: Object.keys(process.env)
-  });
+  throw new Error('No API key found in environment variables');
 }
 
 // Validate API key format
-const apiKey = process.env.OPENAI_API_KEY;
 if (!apiKey.startsWith('sk-')) {
   console.error('Error: Invalid API key format');
   console.log('API key:', apiKey);
-  return res.status(500).json({ 
-    error: 'Invalid API key format',
-    details: 'API key should start with "sk-"',
-    apiKeyStart: apiKey.substring(0, 5)
-  });
+  throw new Error('Invalid API key format');
 }
 
 // Initialize OpenAI with logging
@@ -152,7 +147,8 @@ module.exports = async (req, res) => {
     console.error('Error in investment analysis:', error);
     return res.status(500).json({ 
       error: 'Failed to analyze investment',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 };
