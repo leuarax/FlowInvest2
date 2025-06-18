@@ -2,12 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { 
-        "distDir": "build",
-        "framework": "react"
-      }
+      "src": "next.config.js",
+      "use": "@vercel/next"
     },
     {
       "src": "api/investment.js",
