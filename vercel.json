@@ -16,7 +16,7 @@
   ],
   "routes": [
     {
-      "src": "/api/investment.js",
+      "src": "/api/investment",
       "dest": "/api/investment.js"
     },
     {
