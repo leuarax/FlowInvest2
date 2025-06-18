@@ -53,27 +53,12 @@ async function testApiKey() {
   }
 }
 
-// Test the API key before proceeding
-try {
-  const apiKeyValid = await testApiKey();
-  if (!apiKeyValid) {
-    return res.status(500).json({ 
-      error: 'Invalid API key',
-      details: 'Failed to authenticate with OpenAI'
-    });
-  }
-} catch (error) {
-  console.error('API key validation failed:', error);
-  return res.status(500).json({ 
-    error: 'API key validation failed',
-    details: error.message,
-    stack: error.stack
-  });
-}
-
 // Continue with the main export
 module.exports = async (req, res) => {
   try {
+    // Test API key before processing the request
+    await testApiKey();
+    
     console.log('Received investment analysis request');
     console.log('Request body:', req.body);
     
