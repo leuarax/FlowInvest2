@@ -2,15 +2,16 @@
 // Log function start
 console.log('Analyze portfolio function starting...');
 
-import multer from 'multer';
-import { createServer } from 'http';
-import { parse } from 'url';
-import { join } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import { promises as fs } from 'fs';
-import { v4 as uuidv4 } from 'uuid';
-import OpenAI from 'openai';
+// Use CommonJS require instead of ES modules
+const multer = require('multer');
+const { createServer } = require('http');
+const { parse } = require('url');
+const { join } = require('path');
+const { fileURLToPath } = require('url');
+const { dirname } = require('path');
+const { promises: fs } = require('fs');
+const { v4: uuidv4 } = require('uuid');
+const OpenAI = require('openai');
 
 // Log environment variables (except sensitive ones)
 console.log('Environment:', {
@@ -18,8 +19,9 @@ console.log('Environment:', {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' : 'Not set'
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Use __dirname directly in CommonJS
+const __filename = __filename || '';
+const __dirname = __dirname || process.cwd();
 
 // Initialize OpenAI
 if (!process.env.OPENAI_API_KEY) {
@@ -66,7 +68,8 @@ function sendError(res, status, message, details = '') {
   });
 }
 
-export default async function handler(req, res) {
+// Export the handler function using module.exports for CommonJS
+module.exports = async function handler(req, res) {
   console.log(`\n--- New Request: ${req.method} ${req.url} ---`);
   
   try {

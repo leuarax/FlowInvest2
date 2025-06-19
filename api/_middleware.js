@@ -1,11 +1,11 @@
 // This file helps Vercel understand how to route API requests
-export const config = {
+const config = {
   api: {
     bodyParser: false, // Disable body parsing, we'll handle it with multer
   },
 };
 
-export default function middleware(req, res, next) {
+function middleware(req, res, next) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,3 +22,10 @@ export default function middleware(req, res, next) {
 
   next();
 }
+
+// Export using CommonJS
+module.exports = {
+  config,
+  middleware,
+  default: middleware // For backward compatibility
+};

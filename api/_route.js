@@ -1,19 +1,19 @@
 // This file helps Vercel understand how to route API requests
-import { createServer } from 'http';
-import { parse } from 'url';
-import { join } from 'path';
-import { createServer as createVercelServer } from '@vercel/node';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+const { createServer } = require('http');
+const { parse } = require('url');
+const { join } = require('path');
+const { createServer: createVercelServer } = require('@vercel/node');
+const path = require('path');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Use __dirname in CommonJS
+const __filename = __filename || '';
+const __dirname = __dirname || process.cwd();
 
 // Import the Express app from server.js
-const app = (await import(join(__dirname, '..', 'server.js'))).default;
+const app = require('../server');
 
 // Create Vercel serverless function
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,4 +31,4 @@ export default async function handler(req, res) {
   // Create a serverless request handler
   const serverless = createVercelServer(app);
   return serverless(req, res);
-}
+};
