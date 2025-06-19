@@ -4,14 +4,6 @@
     {
       "src": "api/investment.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { 
-        "distDir": "build",
-        "framework": "react"
-      }
     }
   ],
   "routes": [
@@ -20,12 +12,8 @@
       "dest": "/api/investment.js"
     },
     {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/$1"
     }
   ],
   "env": {
