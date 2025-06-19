@@ -33,19 +33,14 @@ const runMiddleware = (req, res, fn) => {
 
 // The main serverless function
 export default async function handler(req, res) {
-  // Set CORS headers to allow requests from any origin
+  // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // Handle OPTIONS request for preflight
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
+    return res.status(200).end();
   }
 
   if (req.method !== 'POST') {
@@ -54,59 +49,72 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Run multer middleware to handle file upload
     await runMiddleware(req, res, upload.single('screenshot'));
 
     if (!req.file) {
       return res.status(400).json({ error: 'No screenshot file uploaded.' });
     }
 
-    const filePath = req.file.path;
+    // Extract user data and notes from the form
+    const userProfile = req.body.userProfile ? JSON.parse(req.body.userProfile) : {};
+    const additionalNotes = req.body.additionalNotes || '';
 
-    // Read the file and convert to base64
+    const filePath = req.file.path;
     const imageBuffer = fs.readFileSync(filePath);
     const base64Image = imageBuffer.toString('base64');
     const mimeType = req.file.mimetype;
 
-    // Call OpenAI API
+    // Construct the advanced prompt
+    const systemPrompt = `
+      You are a world-class financial analyst and personalized advisor.
+      Your task is to analyze an investment based on a screenshot, user profile, and additional notes.
+
+      **User Profile:**
+      - Experience Level: ${userProfile.experience || 'Not provided'}
+      - Investment Goals: ${userProfile.goals?.join(', ') || 'Not provided'}
+      - Risk Tolerance: ${userProfile.riskTolerance || 'Not provided'}
+      - Interests: ${userProfile.interests?.join(', ') || 'Not provided'}
+
+      **User's Additional Notes:**
+      ${additionalNotes || 'None'}
+
+      **Your Analysis Must Include:**
+      1.  **Basic Details:** Extract 'name', 'type', 'amount', 'quantity', and 'ticker' from the image.
+      2.  **Core Metrics:** Provide a 'riskScore' (1-10), an overall 'grade' ('A' to 'F'), and an 'roiEstimate' (a number representing the percentage, without the '%' sign).
+      3.  **Detailed Explanation:** Provide a comprehensive, multi-paragraph 'analysisExplanation'. This is the most important part. It must:
+          - Justify the risk score, grade, and ROI estimate.
+          - Connect the investment directly to the user's profile (goals, risk, experience).
+          - Explain how this investment fits (or doesn't fit) into their strategy.
+          - Mention any potential red flags or opportunities.
+          - Be written in a clear, encouraging, and professional tone.
+
+      **Output Format:**
+      Return a single, clean JSON object with all the fields mentioned above. Do not include any text outside of the JSON object.
+    `;
+
     const aiResponse = await openai.chat.completions.create({
       model: "gpt-4o",
       response_format: { type: "json_object" },
       messages: [
-        {
-          role: "system",
-          content: `You are an expert financial assistant. Analyze the provided screenshot of a single investment and extract its details. Return a single JSON object with the following fields: 'name', 'type', 'amount', 'purchaseDate', 'quantity', and 'ticker'. In addition, provide an analysis with 'riskScore' (1-10), 'grade' ('A' to 'F'), and 'roiEstimate' (a percentage). If a field is not present in the image, set its value to 'unknown' or a reasonable default.`
-        },
+        { role: "system", content: systemPrompt },
         {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: "Analyze this investment screenshot and return its details in JSON format."
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
-              },
-            },
+            { type: "text", text: "Please analyze this investment based on my profile and the provided screenshot." },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
           ],
         },
       ],
-      max_tokens: 1000,
+      max_tokens: 2000,
     });
 
-    // Clean up the uploaded file
     fs.unlinkSync(filePath);
 
     const investmentData = JSON.parse(aiResponse.choices[0].message.content);
-
-    // Send the successful response
     res.status(200).json(investmentData);
 
   } catch (error) {
     console.error('Error in analyze-screenshot:', error);
-    // Clean up file on error if it exists
     if (req.file && req.file.path) {
       fs.unlinkSync(req.file.path);
     }
