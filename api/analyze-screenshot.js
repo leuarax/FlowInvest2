@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       messages: [
         {
           role: "system",
-          content: `You are an expert financial assistant. Analyze the provided screenshot of a single investment and extract its details. Return a single JSON object with the following fields: 'name', 'type' (e.g., 'Stock', 'ETF', 'Crypto'), 'amount' (a number representing the value), 'purchaseDate' (if visible, otherwise 'unknown'), 'quantity' (if visible), and 'ticker' (if visible). If a field is not present, omit it or set it to null.`
+          content: `You are an expert financial assistant. Analyze the provided screenshot of a single investment and extract its details. Return a single JSON object with the following fields: 'name', 'type', 'amount', 'purchaseDate', 'quantity', and 'ticker'. In addition, provide an analysis with 'riskScore' (1-10), 'grade' ('A' to 'F'), and 'roiEstimate' (a percentage). If a field is not present in the image, set its value to 'unknown' or a reasonable default.`
         },
         {
           role: "user",
