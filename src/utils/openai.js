@@ -2,17 +2,23 @@
 const getApiBaseUrl = () => {
   // In production, use relative URL (will be served from the same domain)
   if (process.env.NODE_ENV === 'production') {
-    return '/api';
+    return ''; // Empty string will make the request relative to the current domain
   }
   // In development, use the local server
-  return 'http://localhost:3001/api';
+  return 'http://localhost:3001';
+};
+
+// Helper to ensure consistent API path formatting
+const getApiPath = (endpoint) => {
+  const base = getApiBaseUrl();
+  return base ? `${base}/api${endpoint}` : `/api${endpoint}`;
 };
 
 export const analyzeInvestment = async (investmentData, userProfile) => {
   try {
     console.log('Sending investment analysis request:', { investmentData, userProfile });
     
-    const response = await fetch(`${getApiBaseUrl()}/investment`, {
+    const response = await fetch(getApiPath('/investment'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +75,7 @@ export const getPortfolioAnalysis = async (investments, userProfile) => {
   try {
     console.log('Sending portfolio analysis request:', { investments, userProfile });
     
-    const response = await fetch(`${getApiBaseUrl()}/portfolio`, {
+    const response = await fetch(getApiPath('/portfolio'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

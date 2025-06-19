@@ -24,13 +24,7 @@
     "dev:server": "nodemon server.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "deploy": "vercel",
-    "vercel-build": "react-scripts build",
-    "now-build": "react-scripts build"
-  },
-  "engines": {
-    "node": ">=14.0.0"
+    "eject": "react-scripts eject"
   },
   "eslintConfig": {
     "extends": [
@@ -45,11 +39,7 @@
     "nodemon": "^3.1.0",
     "vercel": "^35.0.0"
   },
-  "babel": {
-    "presets": [
-      "react-app"
-    ]
-  },
+
   "browserslist": {
     "production": [
       ">0.2%",
