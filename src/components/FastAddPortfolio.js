@@ -53,27 +53,48 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     
     try {
       const formData = new FormData();
-      const file = await fetch(preview).then(r => r.blob());
+      console.log('Creating file blob from preview...');
+      
+      // Convert preview to blob
+      const response = await fetch(preview);
+      if (!response.ok) {
+        throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
+      }
+      
+      const file = await response.blob();
       formData.append('screenshot', file, 'portfolio.png');
       
       console.log('Sending request to analyze portfolio...');
       
-      // Use relative URL - will work in both development and production
-      const response = await fetch('/api/analyze-portfolio', {
+      // Use relative URL that works in both development and production
+      const apiBaseUrl = process.env.NODE_ENV === 'production' ? '' : ''; // Empty string for relative URL
+      const apiResponse = await fetch(`${apiBaseUrl}/api/analyze-portfolio`, {
         method: 'POST',
         body: formData,
+        // Don't set Content-Type header - let the browser set it with the correct boundary
       });
       
-      const data = await response.json().catch(e => {
+      console.log('Received response, status:', apiResponse.status);
+      
+      // Get the response text first for debugging
+      const responseText = await apiResponse.text();
+      console.log('Raw response text:', responseText);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
         console.error('Failed to parse JSON response:', e);
-        throw new Error('Invalid response from server');
-      });
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+      }
       
-      console.log('Received response:', data);
+      console.log('Parsed response data:', data);
       
-      if (!response.ok) {
+      if (!apiResponse.ok) {
         console.error('API Error:', data);
-        throw new Error(data.error || `Server responded with status ${response.status}`);
+        const errorMessage = data?.error || data?.message || `Server responded with status ${apiResponse.status}`;
+        const errorDetails = data?.details || '';
+        throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage);
       }
       
       // Handle both array and single object responses
