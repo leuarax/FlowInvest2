@@ -2,26 +2,33 @@ export const analyzeInvestment = async (investmentData, userProfile) => {
   try {
     console.log('Sending investment analysis request:', { investmentData, userProfile });
     
-    const response = await fetch('/api/investment', {
+    const response = await fetch('http://localhost:3001/api/investment', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({ investmentData, userProfile }),
+      body: JSON.stringify({ 
+        investmentData: {
+          ...investmentData,
+          // Ensure amount is a number
+          amount: Number(investmentData.amount) || 0
+        }, 
+        userProfile 
+      }),
     });
 
     console.log('API response status:', response.status);
     
+    const responseData = await response.json().catch(() => ({}));
+    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.error('API error response:', errorData);
-      throw new Error(`API error: ${errorData?.error || 'Unknown error'}`);
+      console.error('API error response:', responseData);
+      throw new Error(`API error: ${responseData?.error || 'Unknown error'}`);
     }
 
-    const data = await response.json();
-    console.log('API response data:', data);
-    return data;
+    console.log('API response data:', responseData);
+    return responseData;
   } catch (error) {
     console.error('Error analyzing investment:', error);
     throw new Error(`Investment analysis failed: ${error.message}`);
@@ -50,7 +57,9 @@ export const getInvestmentAnalysis = async (investmentData, userProfile) => {
 
 export const getPortfolioAnalysis = async (investments, userProfile) => {
   try {
-    const response = await fetch('/api/portfolio', {
+    console.log('Sending portfolio analysis request:', { investments, userProfile });
+    
+    const response = await fetch('http://localhost:3001/api/portfolio', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,13 +68,19 @@ export const getPortfolioAnalysis = async (investments, userProfile) => {
       body: JSON.stringify({ investments, userProfile }),
     });
 
+    console.log('Portfolio analysis response status:', response.status);
+    
+    const responseData = await response.json().catch(() => ({}));
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Portfolio analysis failed');
+      console.error('Portfolio API error response:', responseData);
+      throw new Error(responseData?.error || 'Portfolio analysis failed');
     }
-    return await response.json();
+
+    console.log('Portfolio analysis response data:', responseData);
+    return responseData;
   } catch (error) {
     console.error('Error in getPortfolioAnalysis:', error);
-    throw error;
+    throw new Error(`Portfolio analysis failed: ${error.message}`);
   }
 };

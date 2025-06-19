@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPortfolioAnalysis } from '../utils/openai';
+import { getPortfolioAnalysis, analyzeInvestment } from '../utils/openai';
 import { useTheme } from '@mui/material/styles';
-import { Container, Box, Typography, Button, Grid, Paper, CircularProgress, IconButton, Divider, Card, CardContent, Modal, Fade, Backdrop } from '@mui/material';
+import { 
+  Container, Box, Typography, Button, Grid, Paper, 
+  CircularProgress, IconButton, Divider, Card, 
+  CardContent, Modal, Fade, Backdrop, Tooltip 
+} from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import SpeedIcon from '@mui/icons-material/Speed';
+import FastAddPortfolio from './FastAddPortfolio';
 
 const getGradeColor = (grade) => {
   if (!grade) return 'text.secondary';
@@ -14,6 +21,15 @@ const getGradeColor = (grade) => {
   if (upperGrade.startsWith('D')) return 'error.light';
   if (upperGrade.startsWith('F')) return 'error.main';
   return 'text.primary';
+};
+
+// Helper function to format ROI values (handles both decimal and percentage formats)
+const formatROI = (value) => {
+  if (value === undefined || value === null) return '0.0';
+  const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+  // If the value is less than 1, assume it's a decimal and multiply by 100
+  const displayValue = Math.abs(numValue) < 1 ? numValue * 100 : numValue;
+  return displayValue.toFixed(1);
 };
 
 const Dashboard = () => {
@@ -30,6 +46,93 @@ const Dashboard = () => {
   const [portfolioAnalysis, setPortfolioAnalysis] = useState(null);
   const [error, setError] = useState('');
   const [selectedInvestment, setSelectedInvestment] = useState(null);
+  const [fastAddOpen, setFastAddOpen] = useState(false);
+  
+  const handleAddInvestments = async (newInvestments) => {
+    try {
+      // Process each new investment to ensure required fields and get analysis
+      const processedInvestments = await Promise.all(newInvestments.map(async (inv) => {
+        // Remove holding time if it exists
+        const { holdingTime, ...investmentWithoutHoldingTime } = inv;
+        
+        // Basic investment data
+        const baseInvestment = {
+          ...investmentWithoutHoldingTime,
+          // Ensure required fields have default values
+          amount: parseFloat(inv.amount) || 0,
+          roiEstimate: inv.roiEstimate || 0,
+          riskScore: inv.riskScore || 5,
+          grade: inv.grade || 'B',
+          date: inv.date || new Date().toISOString().split('T')[0],
+          // Don't include duration/term as it's not needed
+        };
+
+        try {
+          // Get analysis for the investment
+          const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+          const analysis = await analyzeInvestment(
+            {
+              ...baseInvestment,
+              type: inv.type || 'Stock',
+              name: inv.name || 'Unnamed Investment',
+              duration: 'Long-term' // Default duration for analysis
+            },
+            userProfile
+          );
+          
+          // Merge the analysis with the base investment
+          return {
+            ...baseInvestment,
+            roiScenarios: analysis.roiScenarios || {
+              pessimistic: baseInvestment.roiEstimate * 0.8,
+              realistic: baseInvestment.roiEstimate,
+              optimistic: baseInvestment.roiEstimate * 1.2
+            },
+            roiEstimate: analysis.roiEstimate || baseInvestment.roiEstimate,
+            riskScore: analysis.riskScore || baseInvestment.riskScore,
+            grade: analysis.grade || baseInvestment.grade,
+            explanation: analysis.explanation || 'Automatically analyzed investment'
+          };
+        } catch (analysisError) {
+          console.error('Error analyzing investment:', analysisError);
+          // If analysis fails, use default values
+          return {
+            ...baseInvestment,
+            roiScenarios: {
+              pessimistic: baseInvestment.roiEstimate * 0.8,
+              realistic: baseInvestment.roiEstimate,
+              optimistic: baseInvestment.roiEstimate * 1.2
+            },
+            explanation: 'Automatically added investment (analysis not available)'
+          };
+        }
+      }));
+
+      // Update investments in state and localStorage
+      const updatedInvestments = [...investments, ...processedInvestments];
+      setInvestments(updatedInvestments);
+      localStorage.setItem('investments', JSON.stringify(updatedInvestments));
+      
+      // Recalculate stats
+      const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount || 0), 0);
+      const avgROI = updatedInvestments.length > 0 
+        ? updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate || 0), 0) / updatedInvestments.length 
+        : 0;
+      const avgRisk = updatedInvestments.length > 0 
+        ? updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore || 0), 0) / updatedInvestments.length 
+        : 0;
+
+      setStats({
+        totalPortfolio: total,
+        avgROI,
+        avgRisk,
+        investmentCount: updatedInvestments.length,
+      });
+    } catch (error) {
+      console.error('Error adding investments:', error);
+      setError('Failed to add investments. Please try again.');
+    }
+  };
 
   useEffect(() => {
     const userProfile = JSON.parse(localStorage.getItem('userProfile'));
@@ -134,20 +237,38 @@ const Dashboard = () => {
       </Box>
 
       <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
-        <Button
-          variant="contained"
+        <Button 
+          variant="contained" 
+          color="primary" 
           onClick={() => navigate('/add-investment')}
+          startIcon={<AddIcon />}
         >
-          {investments.length > 0 ? '+ Add New Investment' : '+ Start Your Investment Journey'}
+          Add Investment
         </Button>
+        <Tooltip title="Quickly add multiple investments from a screenshot">
+          <Button 
+            variant="outlined" 
+            color="primary" 
+            onClick={() => setFastAddOpen(true)}
+            startIcon={<SpeedIcon />}
+          >
+            Fast Add Portfolio
+          </Button>
+        </Tooltip>
         <Button 
           variant="outlined" 
           onClick={handleGetPortfolioAnalysis} 
-          disabled={loading || investments.length === 0}
+          disabled={investments.length === 0}
         >
-          {loading && !portfolioAnalysis ? <CircularProgress size={24} /> : 'Get Portfolio Assessment'}
+          Analyze Portfolio
         </Button>
       </Box>
+
+      <FastAddPortfolio 
+        open={fastAddOpen} 
+        onClose={() => setFastAddOpen(false)}
+        onAddInvestments={handleAddInvestments}
+      />
 
       <Grid container spacing={3}>
         {statCards.map((card) => (
@@ -238,7 +359,7 @@ const Dashboard = () => {
                   </Box>
                 </Box>
                 <Typography variant="subtitle1" sx={{ mb: 2 }}>
-                  Estimated ROI: {investment.roiEstimate}%
+                  Estimated ROI: {formatROI(investment.roiEstimate)}%
                 </Typography>
               </Paper>
             </Grid>
@@ -274,11 +395,19 @@ const Dashboard = () => {
               </Typography>
               <Typography variant="h6">Risk Score: {selectedInvestment.riskScore}/10</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{selectedInvestment.riskExplanation}</Typography>
-              <Typography variant="h6" sx={{ mb: 2 }}>Average Estimated ROI: {selectedInvestment.roiEstimate}%</Typography>
+              <Typography variant="h6" sx={{ mb: 2 }}>
+                Average Estimated ROI: {formatROI(selectedInvestment.roiEstimate)}%
+              </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
-                <Typography variant="body2">Pessimistic: {selectedInvestment.roiScenarios.pessimistic}%</Typography>
-                <Typography variant="body2">Realistic: {selectedInvestment.roiScenarios.realistic}%</Typography>
-                <Typography variant="body2">Optimistic: {selectedInvestment.roiScenarios.optimistic}%</Typography>
+                <Typography variant="body2">
+                  Pessimistic: {formatROI(selectedInvestment.roiScenarios.pessimistic)}%
+                </Typography>
+                <Typography variant="body2">
+                  Realistic: {formatROI(selectedInvestment.roiScenarios.realistic)}%
+                </Typography>
+                <Typography variant="body2">
+                  Optimistic: {formatROI(selectedInvestment.roiScenarios.optimistic)}%
+                </Typography>
               </Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>Full Analysis:</Typography>
               <Typography variant="body2">{selectedInvestment.explanation}</Typography>

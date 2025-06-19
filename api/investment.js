@@ -82,13 +82,13 @@ module.exports = async (req, res) => {
 
     console.log('Sending request to OpenAI');
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are a financial analyst that provides investment analysis." },
+        { role: "system", content: "You are a senior financial analyst that provides detailed investment analysis." },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
       response_format: { type: "json_object" }
     });
 
@@ -100,10 +100,24 @@ module.exports = async (req, res) => {
     let analysis;
     try {
       analysis = JSON.parse(responseText);
+      
+      // Ensure all required fields are present
+      if (!analysis.grade || !analysis.riskScore || !analysis.roiEstimate || !analysis.explanation) {
+        throw new Error('Incomplete analysis response from AI');
+      }
+      
+      // Ensure riskScore is a number between 1-10
+      analysis.riskScore = Math.max(1, Math.min(10, Number(analysis.riskScore) || 5));
+      
+      // Ensure roiEstimate is a number
+      analysis.roiEstimate = Number(analysis.roiEstimate) || 0;
+      
     } catch (parseError) {
       console.error('Error parsing OpenAI JSON response:', parseError);
+      console.error('Raw response that failed to parse:', responseText);
       return res.status(500).json({ 
         error: 'Failed to parse analysis response from OpenAI',
+        details: parseError.message,
         rawResponse: responseText
       });
     }

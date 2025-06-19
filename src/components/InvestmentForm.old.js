@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme, useMediaQuery } from '@mui/material';
-import { 
-  Container, Box, Typography, TextField, Button, 
-  FormControl, InputLabel, Select, MenuItem, 
-  Grid, Paper, CircularProgress, ToggleButton, 
-  ToggleButtonGroup, Card, CardMedia 
-} from '@mui/material';
+import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress, ToggleButton, ToggleButtonGroup, Card, CardMedia } from '@mui/material';
 import { getInvestmentAnalysis } from '../utils/openai';
 import { interestOptions } from '../utils/constants';
 
@@ -40,10 +35,14 @@ const InvestmentForm = () => {
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
   const [mounted, setMounted] = useState(false);
-  const [inputMethod, setInputMethod] = useState('screenshot');
+  const [inputMethod, setInputMethod] = useState('manual');
   const [screenshot, setScreenshot] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [formData, setFormData] = useState({
     type: '',
     name: '',
@@ -51,10 +50,6 @@ const InvestmentForm = () => {
     duration: '',
     date: '',
   });
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleSaveInvestment = () => {
     const investments = JSON.parse(localStorage.getItem('investments') || '[]');
@@ -76,11 +71,8 @@ const InvestmentForm = () => {
   const handleScreenshotUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      console.log('File selected:', file);
       setScreenshot(file);
       setScreenshotPreview(URL.createObjectURL(file));
-    } else {
-      console.log('No file selected');
     }
   };
 
@@ -97,7 +89,7 @@ const InvestmentForm = () => {
   };
 
   const handleSubmit = async (e) => {
-    e?.preventDefault?.();
+    e.preventDefault();
     
     if (inputMethod === 'manual' && (!formData.type || !formData.name || !formData.amount || !formData.duration || !formData.date)) {
       setError('Please fill in all required fields');
@@ -118,7 +110,7 @@ const InvestmentForm = () => {
         throw new Error('User profile not found. Please complete onboarding first.');
       }
 
-      let analysisResult;
+      let analysis;
       
       if (inputMethod === 'screenshot') {
         const formData = new FormData();
@@ -126,30 +118,22 @@ const InvestmentForm = () => {
         formData.append('additionalNotes', additionalNotes);
         formData.append('userProfile', JSON.stringify(userProfile));
         
-        console.log('Sending screenshot for analysis...');
-        
-        const response = await fetch('http://localhost:3001/api/analyze-screenshot', {
+        const response = await fetch('/api/analyze-screenshot', {
           method: 'POST',
           body: formData,
-          // Don't set Content-Type header, let the browser set it with the correct boundary
-          headers: {
-            'Accept': 'application/json',
-          },
         });
         
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error response:', errorData);
-          throw new Error(errorData.error || `Server responded with status ${response.status}`);
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to analyze screenshot');
         }
         
-        analysisResult = await response.json();
-        console.log('Analysis result:', analysisResult);
+        analysis = await response.json();
       } else {
-        analysisResult = await getInvestmentAnalysis(formData, userProfile);
+        analysis = await getInvestmentAnalysis(formData, userProfile);
       }
       
-      setAnalysis(analysisResult);
+      setAnalysis(analysis);
     } catch (error) {
       console.error('Error analyzing investment:', error);
       let errorMessage = 'An unexpected error occurred';
@@ -199,7 +183,7 @@ const InvestmentForm = () => {
       </Typography>
       <Grid container spacing={4}>
         <Grid item xs={12} md={6}>
-          <Paper sx={paperStyles}>
+          <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h4" sx={{ mb: 3 }}>
               Investment Details
             </Typography>
@@ -210,10 +194,11 @@ const InvestmentForm = () => {
                 exclusive
                 onChange={handleInputMethodChange}
                 aria-label="input method"
+                fullWidth
                 sx={{ mb: 3 }}
               >
-                <ToggleButton value="screenshot">Upload Screenshot</ToggleButton>
                 <ToggleButton value="manual">Manual Input</ToggleButton>
+                <ToggleButton value="screenshot">Upload Screenshot</ToggleButton>
               </ToggleButtonGroup>
 
               {inputMethod === 'screenshot' ? (
@@ -233,7 +218,7 @@ const InvestmentForm = () => {
                       fullWidth
                       sx={{ mb: 2 }}
                     >
-                      {screenshot ? 'Change Screenshot' : 'Upload Screenshot (only one investment)'}
+                      {screenshot ? 'Change Screenshot' : 'Upload Screenshot'}
                     </Button>
                   </label>
                   
@@ -286,11 +271,7 @@ const InvestmentForm = () => {
                   </Button>
                 </Box>
               ) : (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }}>
-                  <input type="submit" style={{ display: 'none' }} />
+                <form onSubmit={handleSubmit}>
                   <FormControl fullWidth sx={{ mb: 3 }}>
                     <InputLabel>Investment Type</InputLabel>
                     <Select
@@ -382,13 +363,11 @@ const InvestmentForm = () => {
             </Box>
           </Paper>
         </Grid>
-        
         <Grid item xs={12} md={6}>
           <Paper sx={paperStyles}>
             <Typography variant="h4" sx={{ mb: 3 }}>
               AI Assessment
             </Typography>
-            
             {analysis ? (
               <Box>
                 <Box sx={{ 
@@ -417,7 +396,6 @@ const InvestmentForm = () => {
                     Overall Grade
                   </Typography>
                 </Box>
-                
                 <Box sx={{ 
                   mb: 3,
                   '& .MuiTypography-root': {
@@ -433,7 +411,6 @@ const InvestmentForm = () => {
                   >
                     Risk Analysis
                   </Typography>
-                  
                   <Box sx={{ mb: 3 }}>
                     <Typography variant="body1">
                       Risk Score: {analysis.riskScore}/10
@@ -464,23 +441,18 @@ const InvestmentForm = () => {
                       </Box>
                     </Box>
                   </Box>
-                  
                   <Typography variant="h6" sx={{ mb: 2 }}>
                     Return on Investment
                   </Typography>
                   <Typography variant="body1">
                     Estimated ROI: {analysis.roiEstimate}%
                   </Typography>
-                  
-                  <Box sx={{ mt: 4, mb: 3, p: 2, backgroundColor: 'background.paper', borderRadius: 1, borderLeft: '4px solid', borderColor: 'primary.main' }}>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'text.primary' }}>
-                      Analysis Explanation
-                    </Typography>
-                    <Typography variant="body1" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
-                      {analysis.explanation}
-                    </Typography>
-                  </Box>
-                  
+                  <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                    Analysis Explanation
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    {analysis.explanation}
+                  </Typography>
                   <Button
                     variant="contained"
                     color="primary"
@@ -497,8 +469,206 @@ const InvestmentForm = () => {
             ) : (
               <Typography variant="body1" sx={{ color: 'text.secondary' }}>
                 {inputMethod === 'screenshot' 
-                  ? 'Upload a screenshot and click "Analyze Screenshot" to get started.'
-                  : 'Fill in the details and click "Get AI Assessment" to analyze your investment.'}
+                  ? 'Upload a screenshot and click "Analyze Screenshot" to get started' 
+                  : 'Fill in the form and click "Get AI Assessment" to analyze your investment'}
+              </Typography>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Container>
+              <TextField
+                fullWidth
+                label="Investment Name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                sx={{ mb: 3 }}
+                required
+              />
+              <TextField
+                fullWidth
+                label="Investment Amount"
+                name="amount"
+                value={formData.amount}
+                onChange={handleInputChange}
+                type="number"
+                sx={{ mb: 3 }}
+                required
+              />
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Holding Time</InputLabel>
+                <Select
+                  value={formData.duration}
+                  onChange={handleInputChange}
+                  name="duration"
+                  label="Holding Time"
+                  required
+                >
+                  {holdingTimeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="Investment Date"
+                name="date"
+                value={formData.date}
+                onChange={handleInputChange}
+                type="date"
+                sx={{ mb: 3 }}
+                required
+                InputLabelProps={{ shrink: true }}
+              />
+              {error && (
+                <Typography color="error" sx={{ mt: 2, mb: 2, p: 2, backgroundColor: 'error.light', borderRadius: 1 }}>
+                  {error}
+                </Typography>
+              )}
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    disabled={loading || !formData.type || !formData.name || !formData.amount || !formData.duration || !formData.date}
+                    sx={{
+                      mt: 2,
+                      width: '100%',
+                    }}
+                  >
+                    {loading ? <CircularProgress size={24} /> : 'Get AI Assessment'}
+                  </Button>
+                </form>
+              )}
+              
+              {inputMethod === 'screenshot' && (
+                <Button
+                  type="button"
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  onClick={handleSubmit}
+                  disabled={loading || !screenshot}
+                  sx={{
+                    mt: 2,
+                    width: '100%',
+                  }}
+                >
+                  {loading ? <CircularProgress size={24} /> : 'Analyze Screenshot'}
+                </Button>
+              )}
+            </Box>
+          </Paper>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <Paper sx={paperStyles}>
+            <Typography variant="h4" sx={{ mb: 3 }}>
+              AI Assessment
+            </Typography>
+            {analysis ? (
+              <Box>
+                <Box sx={{ 
+                  textAlign: 'center', 
+                  mb: 3,
+                  overflow: 'hidden',
+                  wordBreak: 'break-word'
+                }}>
+                  <Typography 
+                    variant={isMobile ? 'h2' : 'h1'} 
+                    component="div" 
+                    sx={{ 
+                      color: getGradeColor(analysis.grade), 
+                      fontWeight: 'bold',
+                      fontSize: isMobile ? '3rem' : '4rem',
+                      lineHeight: 1.2
+                    }}
+                  >
+                    {analysis.grade}
+                  </Typography>
+                  <Typography 
+                    variant={isMobile ? 'subtitle2' : 'subtitle1'} 
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    Overall Grade
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  mb: 3,
+                  '& .MuiTypography-root': {
+                    fontSize: isMobile ? '0.9rem' : '1rem'
+                  }
+                }}>
+                  <Typography 
+                    variant={isMobile ? 'subtitle2' : 'h6'} 
+                    sx={{ 
+                      mb: 1,
+                      fontWeight: isMobile ? 'bold' : 'normal'
+                    }}
+                  >
+                    Risk Analysis
+                  </Typography>
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="body1">
+                      Risk Score: {analysis.riskScore}/10
+                    </Typography>
+                    <Box sx={{ 
+                      width: '100%', 
+                      mt: 1,
+                      '& .MuiLinearProgress-root': {
+                        height: isMobile ? 6 : 8
+                      }
+                    }}>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: 8,
+                          backgroundColor: 'grey.200',
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: `${(analysis.riskScore / 10) * 100}%`,
+                            height: '100%',
+                            backgroundColor: analysis.riskScore > 5 ? 'error.main' : 'success.main',
+                            borderRadius: 2,
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  </Box>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Return on Investment
+                  </Typography>
+                  <Typography variant="body1">
+                    Estimated ROI: {analysis.roiEstimate}%
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                    Analysis Explanation
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    {analysis.explanation}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={handleSaveInvestment}
+                    sx={{
+                      mt: 3,
+                    }}
+                  >
+                    Save Investment
+                  </Button>
+                </Box>
+              </Box>
+            ) : (
+              <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                Click "Get AI Assessment" to analyze your investment
               </Typography>
             )}
           </Paper>
