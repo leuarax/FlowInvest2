@@ -73,16 +73,22 @@ export default async function handler(req, res) {
       **User's Additional Notes:**
       ${additionalNotes || 'None'}
 
-      **Your Analysis Must Include:**
+      **MANDATORY Output Fields:**
+      You MUST return a JSON object containing all of the following fields. Do not omit any of them.
       1.  **Basic Details:** 'name', 'type', 'amount', 'quantity', 'ticker'. If not provided, make reasonable assumptions or state as not available.
-      2.  **Risk Analysis:** A 'riskScore' (1-10) and a concise 'riskExplanation' (1-2 sentences).
-      3.  **Overall Grade:** An overall 'grade' ('A' to 'F').
-      4.  **ROI Scenarios:** An 'roiScenarios' object containing three numerical estimates (without '%' signs): 'pessimistic', 'realistic', and 'optimistic'.
-      5.  **Average ROI:** A single 'roiEstimate' which should be the same as the 'realistic' value from the 'roiScenarios' object.
-      6.  **Full Explanation:** A comprehensive, multi-paragraph 'explanation' that justifies all metrics and connects the investment to the user's profile.
+      2.  **Risk Analysis:**
+          - 'riskScore': A mandatory integer from 1 (lowest risk) to 10 (highest risk).
+          - 'riskExplanation': A mandatory, concise explanation (1-2 sentences).
+      3.  **Overall Grade:**
+          - 'grade': A mandatory letter grade from 'A' (excellent) to 'F' (fail).
+      4.  **ROI Scenarios:**
+          - 'roiScenarios': A mandatory object with three numerical estimates: 'pessimistic', 'realistic', 'optimistic'.
+      5.  **Average ROI:**
+          - 'roiEstimate': A mandatory single number, which MUST be the same as the 'realistic' value.
+      6.  **Full Explanation:**
+          - 'explanation': A mandatory, comprehensive, multi-paragraph justification for all metrics, connecting the investment to the user's profile.
 
-      **Output Format:**
-      Return a single, clean JSON object with all the fields mentioned above. Do not include any text outside of the JSON object.
+      **CRITICAL: Ensure the final output is a single, valid JSON object and nothing else. All fields listed above are required.**
     `;
 
     if (req.file) {
@@ -122,7 +128,39 @@ export default async function handler(req, res) {
       max_tokens: 2000,
     });
 
-    const investmentData = JSON.parse(aiResponse.choices[0].message.content);
+    let investmentData = JSON.parse(aiResponse.choices[0].message.content);
+
+    // Layer 2: Intelligent extraction from explanation text
+    if ((!investmentData.grade || investmentData.grade === 'N/A') && investmentData.explanation) {
+      // More robust regex to find the grade, e.g., "the 'B' grade", "grade is 'A'", etc.
+      const gradeMatch = investmentData.explanation.match(/(?:grade(?: is| of)?|the|a)\s*['"]([A-F])['"]/i);
+      if (gradeMatch && gradeMatch[1]) {
+        investmentData.grade = gradeMatch[1].toUpperCase();
+      }
+    }
+
+    if ((investmentData.riskScore === undefined || investmentData.riskScore === null || investmentData.riskScore === 0) && investmentData.explanation) {
+       // More robust regex to find the risk score, e.g., "risk score of 7", "risk is 5/10"
+      const riskMatch = investmentData.explanation.match(/(?:risk score(?: of| is)?|risk is)\s*(\d{1,2})/i);
+      if (riskMatch && riskMatch[1]) {
+        investmentData.riskScore = parseInt(riskMatch[1], 10);
+      }
+    }
+
+    // Layer 3: Final fallback to ensure critical fields are present
+    if (!investmentData.grade) {
+      investmentData.grade = 'N/A';
+    }
+    if (investmentData.riskScore === undefined || investmentData.riskScore === null) {
+      investmentData.riskScore = 0;
+    }
+    if (!investmentData.roiScenarios) {
+        investmentData.roiScenarios = { pessimistic: 0, realistic: 0, optimistic: 0 };
+    }
+    if (investmentData.roiEstimate === undefined || investmentData.roiEstimate === null) {
+        investmentData.roiEstimate = investmentData.roiScenarios.realistic || 0;
+    }
+
     res.status(200).json(investmentData);
 
   } catch (error) {
