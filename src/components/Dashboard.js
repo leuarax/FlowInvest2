@@ -103,7 +103,7 @@ const Dashboard = () => {
           },
         }}
       >
-        + Start Your Investment Journey
+        {investments.length > 0 ? '+ Add New Investment' : '+ Start Your Investment Journey'}
       </Button>
 
       <Grid container spacing={3}>

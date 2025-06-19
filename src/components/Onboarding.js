@@ -10,6 +10,7 @@ import {
   FormControlLabel,
   FormControl,
   CircularProgress,
+  Checkbox,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
@@ -191,19 +192,25 @@ const Onboarding = () => {
                 >
                   <FormControlLabel
                     control={
-                      <Radio
+                      <Checkbox
                         checked={formData.interests.includes(interest)}
                         onChange={(e) => {
-                          const interests = formData.interests;
-                          if (e.target.checked) {
-                            interests.push(interest);
-                          } else {
-                            interests.splice(interests.indexOf(interest), 1);
-                          }
-                          setFormData({ ...formData, interests });
+                          setFormData(prevData => {
+                            const isChecked = e.target.checked;
+                            if (isChecked) {
+                              return {
+                                ...prevData,
+                                interests: [...prevData.interests, interest]
+                              };
+                            } else {
+                              return {
+                                ...prevData,
+                                interests: prevData.interests.filter(item => item !== interest)
+                              };
+                            }
+                          });
                         }}
-                        name="interests"
-                        value={interest}
+                        name={interest}
                       />
                     }
                     label={interest}
