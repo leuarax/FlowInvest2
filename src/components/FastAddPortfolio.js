@@ -81,16 +81,14 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         data = await makeRequest('https://flowinvest2.vercel.app/api/analyze-portfolio');
       }
 
-      let processedInvestments = [];
-      if (Array.isArray(data.investments)) {
-        processedInvestments = data.investments;
-      } else if (data.investments && typeof data.investments === 'object') {
-        processedInvestments = [data.investments];
-      } else if (Array.isArray(data)) {
-        processedInvestments = data;
-      } else if (data && typeof data === 'object') {
-        processedInvestments = [data];
+      console.log('Received API response on frontend:', JSON.stringify(data, null, 2));
+
+      if (!Array.isArray(data)) {
+        console.error('Data is not an array. Received:', data);
+        throw new Error('API response is not in the expected format. Please try again.');
       }
+
+      const processedInvestments = data;
 
       setInvestments(processedInvestments);
       setSelected(processedInvestments.map(() => true));
