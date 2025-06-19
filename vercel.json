@@ -8,6 +8,10 @@
     {
       "src": "api/investment.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/portfolio.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -16,11 +20,12 @@
       "dest": "/api/investment.js"
     },
     {
+      "src": "/api/portfolio",
+      "dest": "/api/portfolio.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "OPENAI_API_KEY": ""
-  }
+  ]
 }
