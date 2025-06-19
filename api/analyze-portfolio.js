@@ -132,13 +132,38 @@ module.exports = async function handler(req, res) {
       try {
         response = await openai.chat.completions.create({
           model: "gpt-4o",
+          response_format: { type: "json_object" },
           messages: [
+            {
+              role: "system",
+              content: "You are a helpful assistant that analyzes portfolio screenshots and returns investment data in a specific JSON format."
+            },
             {
               role: "user",
               content: [
                 { 
                   type: "text", 
-                  text: "Analyze this portfolio screenshot and return a JSON array of investments. Each investment should have: name, type (Stock, Crypto, etc.), amount (current value), and purchaseDate. Format: [{name: string, type: string, amount: number, purchaseDate: string}]" 
+                  text: `Analyze this portfolio screenshot and return a JSON object with an 'investments' array. Each investment should have: name, type (Stock, Crypto, etc.), amount (current value), and purchaseDate. 
+                  
+                  Example format: 
+                  {
+                    "investments": [
+                      {
+                        "name": "Apple Inc.",
+                        "type": "Stock",
+                        "amount": 1500.50,
+                        "purchaseDate": "2023-01-15"
+                      },
+                      {
+                        "name": "Bitcoin",
+                        "type": "Crypto",
+                        "amount": 0.5,
+                        "purchaseDate": "2022-11-01"
+                      }
+                    ]
+                  }
+                  
+                  Only return the JSON object with no additional text or markdown formatting.`
                 },
                 {
                   type: "image_url",
@@ -149,39 +174,43 @@ module.exports = async function handler(req, res) {
               ],
             },
           ],
-          max_tokens: 1000,
+          max_tokens: 2000,
+          temperature: 0.3,
         });
       } catch (apiError) {
         console.error('OpenAI API Error:', apiError);
         throw new Error(`OpenAI API request failed: ${apiError.message}`);
       }
 
-      const content = response?.choices?.[0]?.message?.content || '[]';
+      const content = response?.choices?.[0]?.message?.content || '{}';
       console.log('Raw AI response received, length:', content.length);
       
       if (!content || content.trim() === '') {
         throw new Error('Empty response from OpenAI');
       }
       
-      // Try to extract JSON from markdown code blocks if present
-      const jsonMatch = content.match(/```(?:json)?\n([\s\S]*?)\n```/);
-      const jsonString = jsonMatch ? jsonMatch[1] : content;
-      
-      console.log('Extracted JSON string:', jsonString);
-      
-      // Clean and parse the JSON
-      const cleanedJsonString = jsonString
-        .replace(/```/g, '')
-        .replace(/^\s*\[\s*\{/s, '[{')
-        .replace(/\}\]\s*$/s, '}]')
-        .trim();
-        
-      console.log('Cleaned JSON string:', cleanedJsonString);
+      console.log('AI Response:', content);
       
       let parsedData;
       try {
-        parsedData = JSON.parse(cleanedJsonString);
-        console.log('Successfully parsed JSON:', JSON.stringify(parsedData, null, 2));
+        // Try to parse the content directly as JSON
+        parsedData = JSON.parse(content);
+        
+        // If the response has an investments array, use it
+        if (parsedData.investments && Array.isArray(parsedData.investments)) {
+          parsedData = parsedData.investments;
+        } else if (Array.isArray(parsedData)) {
+          // If it's already an array, use it directly
+          parsedData = parsedData;
+        } else {
+          // If it's an object but not in expected format, try to convert it
+          parsedData = Object.entries(parsedData).map(([key, value]) => ({
+            name: key,
+            ...(typeof value === 'object' ? value : { amount: value })
+          }));
+        }
+        
+        console.log('Successfully parsed investments:', JSON.stringify(parsedData, null, 2));
       } catch (e) {
         console.error('Error parsing JSON:', e);
         return res.status(400).json({ 
