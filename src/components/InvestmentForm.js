@@ -57,11 +57,28 @@ const InvestmentForm = () => {
   }, []);
 
   const handleSaveInvestment = () => {
+    // Prioritize data from AI analysis, falling back to initial form data.
+    const newInvestment = {
+      id: Date.now(),
+      name: analysis?.name || formData.name,
+      type: analysis?.type || formData.type,
+      amount: analysis?.amount || formData.amount,
+      purchaseDate: formData.date,
+      quantity: analysis?.quantity || '',
+      ticker: analysis?.ticker || '',
+      additionalNotes: additionalNotes,
+      // Create the nested 'analysis' object that the dashboard expects.
+      analysis: {
+        grade: analysis?.grade,
+        riskScore: analysis?.riskScore,
+        roiEstimate: analysis?.roiEstimate,
+        // Map 'analysisExplanation' from the API to 'explanation' for the dashboard.
+        explanation: analysis?.analysisExplanation,
+      },
+    };
+
     const investments = JSON.parse(localStorage.getItem('investments') || '[]');
-    localStorage.setItem('investments', JSON.stringify([
-      ...investments,
-      { ...formData, ...analysis },
-    ]));
+    localStorage.setItem('investments', JSON.stringify([...investments, newInvestment]));
     navigate('/dashboard');
   };
 
@@ -482,9 +499,11 @@ const InvestmentForm = () => {
                     <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', color: 'text.primary' }}>
                       Analysis Explanation
                     </Typography>
-                    <Typography variant="body1" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
-                      {analysis.explanation}
-                    </Typography>
+                    {analysis && analysis.analysisExplanation && (
+                      <Typography variant="body1" sx={{ color: 'text.primary', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                        {analysis.analysisExplanation}
+                      </Typography>
+                    )}
                   </Box>
                   
                   <Button
