@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@babel/core": "^7.24.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.6",
@@ -21,14 +22,14 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "dev:server": "nodemon --experimental-modules server.js",
-    "build": "react-scripts build",
+    "dev:server": "nodemon server.js",
+    "build": "CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "vercel-build": "react-scripts build"
+    "vercel-build": "npm install && npm run build"
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": "18.x"
   },
   "eslintConfig": {
     "extends": [
@@ -36,16 +37,23 @@
       "react-app/jest"
     ]
   },
-  "type": "commonjs",
   "main": "server.js",
+  "type": "commonjs",
+  "browser": {
+    "fs": false,
+    "path": false,
+    "os": false
+  },
   "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "nodemon": "^3.1.0",
     "vercel": "^35.0.0"
   },
-
   "browserslist": {
     "production": [
       ">0.2%",
@@ -56,6 +64,34 @@
       "last 1 chrome version",
       "last 1 firefox version",
       "last 1 safari version"
+    ]
+  },
+  "babel": {
+    "presets": [
+      ["@babel/preset-react", { "runtime": "automatic" }],
+      ["@babel/preset-env", {
+        "targets": {
+          "node": "18.x"
+        },
+        "modules": "commonjs"
+      }]
+    ],
+    "plugins": [
+      ["@babel/plugin-transform-runtime", {
+        "regenerator": true
+      }]
+    ]
+  },
+  "vercel": {
+    "rewrites": [
+      {
+        "source": "/api/(.*)",
+        "destination": "/api/$1"
+      },
+      {
+        "source": "/(.*)",
+        "destination": "/index.html"
+      }
     ]
   }
 }
