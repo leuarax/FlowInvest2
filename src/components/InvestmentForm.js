@@ -241,7 +241,7 @@ const InvestmentForm = () => {
                   <Grid item xs={12} sm={4}>
                     <Paper elevation={2} sx={{ p: 2, textAlign: 'center', height: '100%' }}>
                       <Typography variant="h2" sx={{ color: getGradeColor(analysis.grade), fontWeight: 'bold' }}>
-                        {analysis.grade}
+                        {analysis.grade || '-'}
                       </Typography>
                       <Typography variant="subtitle1" color="text.secondary">Overall Grade</Typography>
                     </Paper>
@@ -249,8 +249,8 @@ const InvestmentForm = () => {
                   <Grid item xs={12} sm={8}>
                     <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
                       <Typography variant="h6">Risk Analysis</Typography>
-                      <Typography variant="body1">Score: {analysis.riskScore}/10</Typography>
-                      <LinearProgress variant="determinate" value={analysis.riskScore * 10} sx={{ height: 10, borderRadius: 5, my: 1 }} />
+                      <Typography variant="body1">Score: {analysis.riskScore || 'N/A'}/10</Typography>
+                      <LinearProgress variant="determinate" value={(analysis.riskScore || 0) * 10} sx={{ height: 10, borderRadius: 5, my: 1 }} />
                       {analysis.riskExplanation && <Typography variant="body2" color="text.secondary">{analysis.riskExplanation}</Typography>}
                     </Paper>
                   </Grid>
