@@ -19,9 +19,7 @@ console.log('Environment:', {
   OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' : 'Not set'
 });
 
-// Use __dirname directly in CommonJS
-const __filename = __filename || '';
-const __dirname = __dirname || process.cwd();
+// __filename and __dirname are already available in CommonJS
 
 // Initialize OpenAI
 if (!process.env.OPENAI_API_KEY) {

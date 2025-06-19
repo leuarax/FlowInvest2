@@ -5,9 +5,7 @@ const { join } = require('path');
 const { createServer: createVercelServer } = require('@vercel/node');
 const path = require('path');
 
-// Use __dirname in CommonJS
-const __filename = __filename || '';
-const __dirname = __dirname || process.cwd();
+// __filename and __dirname are already available in CommonJS
 
 // Import the Express app from server.js
 const app = require('../server');
