@@ -2,30 +2,23 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "package.json",
-      "use": "@vercel/static-build"
-    },
-    {
-      "src": "api/investment.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/portfolio.js",
-      "use": "@vercel/node"
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
     }
   ],
   "routes": [
     {
-      "src": "/api/investment",
-      "dest": "/api/investment.js"
-    },
-    {
-      "src": "/api/portfolio",
-      "dest": "/api/portfolio.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/"
     }
   ]
 }
