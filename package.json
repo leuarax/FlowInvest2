@@ -1,5 +1,5 @@
 {
-  "name": "vibeinvest",
+  "name": "flowinvest",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -22,8 +22,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "dev:server": "nodemon server.js",
-    "build": "CI=false react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "vercel-build": "npm install && npm run build"
@@ -38,22 +37,7 @@
     ]
   },
   "main": "server.js",
-  "type": "commonjs",
-  "browser": {
-    "fs": false,
-    "path": false,
-    "os": false
-  },
-  "babel": {
-    "presets": [
-      ["@babel/preset-react", { "runtime": "automatic" }],
-      ["@babel/preset-env", {
-        "targets": {
-          "esmodules": true
-        }
-      }]
-    ]
-  },
+  "type": "module",
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.27.4",
     "@babel/preset-env": "^7.27.2",
