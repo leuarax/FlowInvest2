@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPortfolioAnalysis } from '../utils/openai';
 import { useTheme } from '@mui/material/styles';
-import { Container, Box, Typography, Button, Grid, Paper, CircularProgress, IconButton, List, ListItem, ListItemText, Divider, Card, CardContent, Modal, Fade, Backdrop } from '@mui/material';
+import { Container, Box, Typography, Button, Grid, Paper, CircularProgress, IconButton, Divider, Card, CardContent, Modal, Fade, Backdrop } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 const getGradeColor = (grade) => {
