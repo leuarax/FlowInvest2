@@ -125,25 +125,31 @@ const InvestmentForm = () => {
         formData.append('screenshot', screenshot);
         formData.append('additionalNotes', additionalNotes);
         formData.append('userProfile', JSON.stringify(userProfile));
-        
+
         console.log('Sending screenshot for analysis...');
-        
-        const response = await fetch('http://localhost:3001/api/analyze-screenshot', {
-          method: 'POST',
-          body: formData,
-          // Don't set Content-Type header, let the browser set it with the correct boundary
-          headers: {
-            'Accept': 'application/json',
-          },
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Error response:', errorData);
-          throw new Error(errorData.error || `Server responded with status ${response.status}`);
+
+        const makeRequest = async (url) => {
+          const res = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Accept': 'application/json',
+            },
+          });
+          if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            console.error('Error response:', errorData);
+            throw new Error(errorData.error || `Server responded with status ${res.status}`);
+          }
+          return res.json();
+        };
+
+        try {
+          analysisResult = await makeRequest('/api/analyze-screenshot');
+        } catch (e) {
+          console.log('Relative URL failed, trying absolute URL...', e);
+          analysisResult = await makeRequest('https://flowinvest2.vercel.app/api/analyze-screenshot');
         }
-        
-        analysisResult = await response.json();
         console.log('Analysis result:', analysisResult);
       } else {
         analysisResult = await getInvestmentAnalysis(formData, userProfile);
