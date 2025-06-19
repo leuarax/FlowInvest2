@@ -153,7 +153,18 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: 'AI returned malformed analysis data.' });
     }
 
-    // Step 4: Add fallbacks as a final safety net.
+    // Step 4: Transform the data to match the frontend's expected flat structure.
+    if (investmentData.riskAnalysis) {
+      investmentData.riskScore = investmentData.riskAnalysis.riskScore;
+      investmentData.riskExplanation = investmentData.riskAnalysis.riskExplanation;
+      delete investmentData.riskAnalysis; // Clean up the old nested object
+    }
+    if (investmentData.overallGrade) {
+      investmentData.grade = investmentData.overallGrade;
+      delete investmentData.overallGrade; // Clean up the old key
+    }
+
+    // Step 5: Add fallbacks as a final safety net.
     investmentData.grade = investmentData.grade || 'N/A';
     investmentData.riskScore = investmentData.riskScore === undefined ? 0 : investmentData.riskScore;
     investmentData.roiScenarios = investmentData.roiScenarios || { pessimistic: 0, realistic: 0, optimistic: 0 };
