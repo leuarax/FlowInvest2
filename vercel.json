@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "package.json",
+      "use": "@vercel/static-build"
+    },
+    {
       "src": "api/investment.js",
       "use": "@vercel/node"
     }
@@ -13,7 +17,7 @@
     },
     {
       "src": "/(.*)",
-      "dest": "/$1"
+      "dest": "/"
     }
   ],
   "env": {
