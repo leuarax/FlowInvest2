@@ -32,14 +32,12 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result);
     };
     reader.readAsDataURL(file);
 
-    // Reset state
     setInvestments([]);
     setSelected([]);
     setError('');
@@ -47,92 +45,56 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
 
   const handleUpload = async () => {
     if (!preview) return;
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
-      const formData = new FormData();
-      console.log('Creating file blob from preview...');
-      
-      // Convert preview to blob
       const response = await fetch(preview);
-      if (!response.ok) {
-        throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
-      }
-      
-      const file = await response.blob();
-      formData.append('screenshot', file, 'portfolio.png');
-      
-      console.log('Sending request to analyze portfolio...');
-      
-      console.log('Sending request to analyze portfolio...');
-      
-      // Use absolute URL for API endpoint in production, relative in development
-      const isProduction = process.env.NODE_ENV === 'production';
-      const apiBaseUrl = isProduction ? 'https://flowinvest2.vercel.app' : '';
-      const apiUrl = `${apiBaseUrl}/api/analyze-portfolio`;
-      
-      console.log('API URL:', apiUrl);
-      
-      const apiResponse = await fetch(apiUrl, {
-        method: 'POST',
-        body: formData,
-        // Don't set Content-Type header - let the browser set it with the correct boundary
-      });
-      
-      console.log('Received response, status:', apiResponse.status);
-      
-      // Get the response text first for debugging
-      const responseText = await apiResponse.text();
-      console.log('Raw response text:', responseText);
-      
+      const blob = await response.blob();
+      const formData = new FormData();
+      formData.append('screenshot', blob, 'portfolio.png');
+
+      const makeRequest = async (url) => {
+        const res = await fetch(url, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+          mode: 'cors'
+        });
+        const resText = await res.text();
+        if (!res.ok) {
+          throw new Error(`Request failed: ${res.status} - ${resText}`);
+        }
+        try {
+          return JSON.parse(resText);
+        } catch (err) {
+          throw new Error(`Invalid JSON response: ${resText.substring(0, 200)}...`);
+        }
+      };
+
       let data;
       try {
-        data = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse JSON response:', e);
-        console.error('Response headers:', Object.fromEntries([...apiResponse.headers.entries()]));
-        throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
+        data = await makeRequest('/api/analyze-portfolio');
+      } catch (err) {
+        console.log('Relative URL failed, trying absolute URL...', err);
+        data = await makeRequest('https://flowinvest2.vercel.app/api/analyze-portfolio');
       }
-      
-      console.log('Parsed response data:', data);
-      console.log('Response status:', apiResponse.status);
-      
-      if (!apiResponse.ok) {
-        console.error('API Error:', {
-          status: apiResponse.status,
-          statusText: apiResponse.statusText,
-          data: data,
-          headers: Object.fromEntries([...apiResponse.headers.entries()])
-        });
-        
-        let errorMessage = `Server responded with status ${apiResponse.status}`;
-        if (data) {
-          errorMessage = data.error || data.message || JSON.stringify(data);
-          if (data.details) {
-            errorMessage += `: ${data.details}`;
-          }
-        }
-        
-        throw new Error(errorMessage);
-      }
-      
-      // Handle both array and single object responses
-      let investments = [];
+
+      let processedInvestments = [];
       if (Array.isArray(data.investments)) {
-        investments = data.investments;
+        processedInvestments = data.investments;
       } else if (data.investments && typeof data.investments === 'object') {
-        investments = [data.investments];
+        processedInvestments = [data.investments];
       } else if (Array.isArray(data)) {
-        investments = data;
+        processedInvestments = data;
       } else if (data && typeof data === 'object') {
-        investments = [data];
+        processedInvestments = [data];
       }
-      
-      console.log('Processed investments:', investments);
-      setInvestments(investments);
-      setSelected(Array(investments.length).fill(true));
+
+      setInvestments(processedInvestments);
+      setSelected(processedInvestments.map(() => true));
+
     } catch (err) {
       console.error('Error analyzing portfolio:', err);
       setError(err.message || 'Failed to analyze portfolio');
@@ -142,7 +104,11 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
   };
 
   const handleSelectAll = (event) => {
-    setSelected(selected.map(() => event.target.checked));
+    if (event.target.checked) {
+      setSelected(investments.map(() => true));
+    } else {
+      setSelected(investments.map(() => false));
+    }
   };
 
   const handleSelectOne = (index) => {
@@ -227,46 +193,52 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
               <Box display="flex" justifyContent="center" my={4}>
                 <CircularProgress />
               </Box>
+            ) : error ? (
+              <Box color="error.main" my={2}>
+                <Typography variant="body2">{error}</Typography>
+              </Box>
             ) : investments.length > 0 ? (
               <Box mt={2}>
-                <Typography variant="subtitle1" gutterBottom>
+                <Typography variant="subtitle2" gutterBottom>
                   Detected Investments:
                 </Typography>
-                <TableContainer component={Paper}>
+                <TableContainer component={Paper} variant="outlined">
                   <Table size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell padding="checkbox">
                           <Checkbox
-                            checked={selected.every(Boolean)}
+                            checked={selected.length > 0 && selected.every(Boolean)}
+                            indeterminate={
+                              selected.some(Boolean) && !selected.every(Boolean)
+                            }
                             onChange={handleSelectAll}
-                            indeterminate={selected.some(Boolean) && !selected.every(Boolean)}
                           />
                         </TableCell>
                         <TableCell>Name</TableCell>
                         <TableCell>Type</TableCell>
                         <TableCell align="right">Amount</TableCell>
-                        <TableCell>Quantity</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {investments.map((investment, index) => (
-                        <TableRow key={index} hover>
+                        <TableRow key={index}>
                           <TableCell padding="checkbox">
                             <Checkbox
-                              checked={selected[index]}
+                              checked={selected[index] || false}
                               onChange={() => handleSelectOne(index)}
                             />
                           </TableCell>
-                          <TableCell>{investment.name}</TableCell>
-                          <TableCell>{investment.type}</TableCell>
+                          <TableCell>{investment.name || 'Unknown'}</TableCell>
+                          <TableCell>{investment.type || 'Stock'}</TableCell>
                           <TableCell align="right">
-                            {investment.amount?.toLocaleString('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                            })}
+                            {typeof investment.amount === 'number'
+                              ? `$${investment.amount.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                })}`
+                              : investment.amount || 'N/A'}
                           </TableCell>
-                          <TableCell>{investment.quantity || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -274,53 +246,26 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
                 </TableContainer>
               </Box>
             ) : null}
-            {error && (
-              <Typography color="error" variant="body2" sx={{ mt: 2 }}>
-                {error}
-              </Typography>
-            )}
           </Box>
         )}
       </DialogContent>
-      <DialogActions sx={{ p: 2, justifyContent: 'space-between' }}>
+      <DialogActions>
         <Button onClick={handleClose} color="inherit">
           Cancel
         </Button>
-        {preview ? (
-          <>
-            <input
-              accept="image/*"
-              style={{ display: 'none' }}
-              id="retry-upload"
-              type="file"
-              onChange={handleFileChange}
-            />
-            <label htmlFor="retry-upload">
-              <Button component="span" color="inherit">
-                Retry
-              </Button>
-            </label>
-            {investments.length > 0 ? (
-              <Button
-                onClick={handleAddSelected}
-                color="primary"
-                variant="contained"
-                disabled={!selected.some(Boolean)}
-              >
-                Add Selected ({selected.filter(Boolean).length})
-              </Button>
-            ) : (
-              <Button
-                onClick={handleUpload}
-                color="primary"
-                variant="contained"
-                disabled={!preview}
-              >
-                Analyze Portfolio
-              </Button>
-            )}
-          </>
-        ) : null}
+        {investments.length > 0 && (
+          <Button onClick={handleUpload} color="primary" disabled={loading}>
+            Re-analyze
+          </Button>
+        )}
+        <Button
+          onClick={investments.length > 0 ? handleAddSelected : handleUpload}
+          color="primary"
+          variant="contained"
+          disabled={loading || (investments.length > 0 && selected.filter(Boolean).length === 0)}
+        >
+          {loading ? <CircularProgress size={24} /> : (investments.length > 0 ? 'Add Selected' : 'Analyze')}
+        </Button>
       </DialogActions>
     </Dialog>
   );
