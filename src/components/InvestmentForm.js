@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-// // import { useTheme } from '@mui/material/styles';
+import { useTheme, useMediaQuery } from '@mui/material';
 import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress } from '@mui/material';
 import { getInvestmentAnalysis } from '../utils/openai';
 import { interestOptions } from '../utils/constants';
@@ -29,10 +29,16 @@ const getGradeColor = (grade) => {
 
 const InvestmentForm = () => {
   const navigate = useNavigate();
-// const theme = useTheme();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [error, setError] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [formData, setFormData] = useState({
     type: '',
     name: '',
@@ -93,8 +99,32 @@ const InvestmentForm = () => {
     }
   };
 
+  if (!mounted) {
+    return null;
+  }
+
+  const containerStyles = isMobile ? { 
+    width: '100%', 
+    maxWidth: '100%',
+    px: 2,
+    mt: 2
+  } : { 
+    maxWidth: 'lg',
+    mt: 4 
+  };
+
+  const paperStyles = isMobile ? {
+    p: 2,
+    overflow: 'hidden',
+    width: '100%',
+    boxSizing: 'border-box'
+  } : {
+    p: 3,
+    height: '100%'
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
+    <Container sx={containerStyles}>
       <Typography variant="h1" component="h1" sx={{ mb: 4 }}>
         FlowInvest
       </Typography>
@@ -195,64 +225,101 @@ const InvestmentForm = () => {
             </Typography>
             {analysis ? (
               <Box>
-                <Box sx={{ textAlign: 'center', mb: 3 }}>
-                  <Typography variant="h1" component="div" sx={{ color: getGradeColor(analysis.grade), fontWeight: 'bold' }}>
+                <Box sx={{ 
+                  textAlign: 'center', 
+                  mb: 3,
+                  overflow: 'hidden',
+                  wordBreak: 'break-word'
+                }}>
+                  <Typography 
+                    variant={isMobile ? 'h2' : 'h1'} 
+                    component="div" 
+                    sx={{ 
+                      color: getGradeColor(analysis.grade), 
+                      fontWeight: 'bold',
+                      fontSize: isMobile ? '3rem' : '4rem',
+                      lineHeight: 1.2
+                    }}
+                  >
                     {analysis.grade}
                   </Typography>
-                  <Typography variant="subtitle1" color="text.secondary">
+                  <Typography 
+                    variant={isMobile ? 'subtitle2' : 'subtitle1'} 
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
                     Overall Grade
                   </Typography>
                 </Box>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  Risk Analysis
-                </Typography>
-                <Box sx={{ mb: 3 }}>
-                  <Typography variant="body1">
-                    Risk Score: {analysis.riskScore}/10
+                <Box sx={{ 
+                  mb: 3,
+                  '& .MuiTypography-root': {
+                    fontSize: isMobile ? '0.9rem' : '1rem'
+                  }
+                }}>
+                  <Typography 
+                    variant={isMobile ? 'subtitle2' : 'h6'} 
+                    sx={{ 
+                      mb: 1,
+                      fontWeight: isMobile ? 'bold' : 'normal'
+                    }}
+                  >
+                    Risk Analysis
                   </Typography>
-                  <Box sx={{ width: '100%', mt: 1 }}>
-                    <Box
-                      sx={{
-                        width: '100%',
-                        height: 8,
-                        backgroundColor: 'grey.200',
-                        borderRadius: 2,
-                      }}
-                    >
+                  <Box sx={{ mb: 3 }}>
+                    <Typography variant="body1">
+                      Risk Score: {analysis.riskScore}/10
+                    </Typography>
+                    <Box sx={{ 
+                      width: '100%', 
+                      mt: 1,
+                      '& .MuiLinearProgress-root': {
+                        height: isMobile ? 6 : 8
+                      }
+                    }}>
                       <Box
                         sx={{
-                          width: `${(analysis.riskScore / 10) * 100}%`,
-                          height: '100%',
-                          backgroundColor: analysis.riskScore > 5 ? 'error.main' : 'success.main',
+                          width: '100%',
+                          height: 8,
+                          backgroundColor: 'grey.200',
                           borderRadius: 2,
                         }}
-                      />
+                      >
+                        <Box
+                          sx={{
+                            width: `${(analysis.riskScore / 10) * 100}%`,
+                            height: '100%',
+                            backgroundColor: analysis.riskScore > 5 ? 'error.main' : 'success.main',
+                            borderRadius: 2,
+                          }}
+                        />
+                      </Box>
                     </Box>
                   </Box>
+                  <Typography variant="h6" sx={{ mb: 2 }}>
+                    Return on Investment
+                  </Typography>
+                  <Typography variant="body1">
+                    Estimated ROI: {analysis.roiEstimate}%
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+                    Analysis Explanation
+                  </Typography>
+                  <Typography sx={{ color: 'text.secondary' }}>
+                    {analysis.explanation}
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    onClick={handleSaveInvestment}
+                    sx={{
+                      mt: 3,
+                    }}
+                  >
+                    Save Investment
+                  </Button>
                 </Box>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  Return on Investment
-                </Typography>
-                <Typography variant="body1">
-                  Estimated ROI: {analysis.roiEstimate}%
-                </Typography>
-                <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
-                  Analysis Explanation
-                </Typography>
-                <Typography sx={{ color: 'text.secondary' }}>
-                  {analysis.explanation}
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  onClick={handleSaveInvestment}
-                  sx={{
-                    mt: 3,
-                  }}
-                >
-                  Save Investment
-                </Button>
               </Box>
             ) : (
               <Typography variant="body1" sx={{ color: 'text.secondary' }}>
