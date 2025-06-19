@@ -49,25 +49,20 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Process multipart form data
     await runMiddleware(req, res, upload.single('screenshot'));
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No screenshot file uploaded.' });
-    }
-
-    // Extract user data and notes from the form
+    // Extract shared data
     const userProfile = req.body.userProfile ? JSON.parse(req.body.userProfile) : {};
     const additionalNotes = req.body.additionalNotes || '';
+    const manualData = req.body.manualData ? JSON.parse(req.body.manualData) : null;
 
-    const filePath = req.file.path;
-    const imageBuffer = fs.readFileSync(filePath);
-    const base64Image = imageBuffer.toString('base64');
-    const mimeType = req.file.mimetype;
+    let userContent;
 
-    // Construct the advanced prompt
+    // Define the core analysis prompt structure
     const systemPrompt = `
       You are a world-class financial analyst and personalized advisor.
-      Your task is to analyze an investment based on a screenshot, user profile, and additional notes.
+      Your task is to analyze an investment based on the provided data, user profile, and additional notes.
 
       **User Profile:**
       - Experience Level: ${userProfile.experience || 'Not provided'}
@@ -79,45 +74,63 @@ export default async function handler(req, res) {
       ${additionalNotes || 'None'}
 
       **Your Analysis Must Include:**
-      1.  **Basic Details:** Extract 'name', 'type', 'amount', 'quantity', and 'ticker' from the image.
-      2.  **Core Metrics:** Provide a 'riskScore' (1-10), an overall 'grade' ('A' to 'F'), and an 'roiEstimate' (a number representing the percentage, without the '%' sign).
-      3.  **Detailed Explanation:** Provide a comprehensive, multi-paragraph 'analysisExplanation'. This is the most important part. It must:
-          - Justify the risk score, grade, and ROI estimate.
-          - Connect the investment directly to the user's profile (goals, risk, experience).
-          - Explain how this investment fits (or doesn't fit) into their strategy.
-          - Mention any potential red flags or opportunities.
-          - Be written in a clear, encouraging, and professional tone.
+      1.  **Basic Details:** 'name', 'type', 'amount', 'quantity', 'ticker'. If not provided, make reasonable assumptions or state as not available.
+      2.  **Risk Analysis:** A 'riskScore' (1-10) and a concise 'riskExplanation' (1-2 sentences).
+      3.  **Overall Grade:** An overall 'grade' ('A' to 'F').
+      4.  **ROI Scenarios:** An 'roiScenarios' object containing three numerical estimates (without '%' signs): 'pessimistic', 'realistic', and 'optimistic'.
+      5.  **Average ROI:** A single 'roiEstimate' which should be the same as the 'realistic' value from the 'roiScenarios' object.
+      6.  **Full Explanation:** A comprehensive, multi-paragraph 'explanation' that justifies all metrics and connects the investment to the user's profile.
 
       **Output Format:**
       Return a single, clean JSON object with all the fields mentioned above. Do not include any text outside of the JSON object.
     `;
+
+    if (req.file) {
+      // Handle screenshot analysis
+      const filePath = req.file.path;
+      const imageBuffer = fs.readFileSync(filePath);
+      const base64Image = imageBuffer.toString('base64');
+      const mimeType = req.file.mimetype;
+
+      userContent = [
+        { type: "text", text: "Please analyze this investment based on my profile and the provided screenshot." },
+        { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+      ];
+      
+      // Clean up the uploaded file
+      req.on('end', () => fs.unlinkSync(filePath));
+
+    } else if (manualData) {
+      // Handle manual data analysis
+      userContent = [
+        { 
+          type: "text", 
+          text: `Please analyze the following investment based on my profile and the data below.\n\n          **Investment Data:**\n          - Name: ${manualData.name}\n          - Type: ${manualData.type}\n          - Amount: ${manualData.amount}\n          - Purchase Date: ${manualData.date}\n          \n          Provide your full analysis in the required JSON format.`
+        },
+      ];
+    } else {
+      return res.status(400).json({ error: 'No screenshot file or manual data provided.' });
+    }
 
     const aiResponse = await openai.chat.completions.create({
       model: "gpt-4o",
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            { type: "text", text: "Please analyze this investment based on my profile and the provided screenshot." },
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-          ],
-        },
+        { role: "user", content: userContent },
       ],
       max_tokens: 2000,
     });
-
-    fs.unlinkSync(filePath);
 
     const investmentData = JSON.parse(aiResponse.choices[0].message.content);
     res.status(200).json(investmentData);
 
   } catch (error) {
     console.error('Error in analyze-screenshot:', error);
-    if (req.file && req.file.path) {
+    // Ensure file is deleted even on error if it exists
+    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-    res.status(500).json({ error: 'Failed to analyze screenshot.', details: error.message });
+    res.status(500).json({ error: 'Failed to analyze investment.', details: error.message });
   }
 }
