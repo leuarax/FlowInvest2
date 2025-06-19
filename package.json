@@ -23,7 +23,7 @@
   "scripts": {
     "start": "react-scripts start",
     "dev:server": "nodemon server.js",
-    "build": "CI=false react-scripts build",
+    "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "vercel-build": "npm install && npm run build"
@@ -68,18 +68,7 @@
   },
   "babel": {
     "presets": [
-      ["@babel/preset-react", { "runtime": "automatic" }],
-      ["@babel/preset-env", {
-        "targets": {
-          "node": "18.x"
-        },
-        "modules": "commonjs"
-      }]
-    ],
-    "plugins": [
-      ["@babel/plugin-transform-runtime", {
-        "regenerator": true
-      }]
+      "react-app"
     ]
   },
   "vercel": {
