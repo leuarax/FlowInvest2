@@ -1,8 +1,18 @@
+// Get the base URL based on the environment
+const getApiBaseUrl = () => {
+  // In production, use relative URL (will be served from the same domain)
+  if (process.env.NODE_ENV === 'production') {
+    return '/api';
+  }
+  // In development, use the local server
+  return 'http://localhost:3001/api';
+};
+
 export const analyzeInvestment = async (investmentData, userProfile) => {
   try {
     console.log('Sending investment analysis request:', { investmentData, userProfile });
     
-    const response = await fetch('http://localhost:3001/api/investment', {
+    const response = await fetch(`${getApiBaseUrl()}/investment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -59,7 +69,7 @@ export const getPortfolioAnalysis = async (investments, userProfile) => {
   try {
     console.log('Sending portfolio analysis request:', { investments, userProfile });
     
-    const response = await fetch('http://localhost:3001/api/portfolio', {
+    const response = await fetch(`${getApiBaseUrl()}/portfolio`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -25,7 +25,12 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy": "vercel"
+    "deploy": "vercel",
+    "vercel-build": "react-scripts build",
+    "now-build": "react-scripts build"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   },
   "eslintConfig": {
     "extends": [
@@ -39,6 +44,11 @@
     "express": "^4.21.2",
     "nodemon": "^3.1.0",
     "vercel": "^35.0.0"
+  },
+  "babel": {
+    "presets": [
+      "react-app"
+    ]
   },
   "browserslist": {
     "production": [

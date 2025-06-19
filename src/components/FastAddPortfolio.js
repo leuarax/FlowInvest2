@@ -45,6 +45,16 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     setError('');
   };
 
+  // Get the base URL based on the environment
+  const getApiBaseUrl = () => {
+    // In production, use relative URL (will be served from the same domain)
+    if (process.env.NODE_ENV === 'production') {
+      return '';
+    }
+    // In development, use the local server
+    return 'http://localhost:3001';
+  };
+
   const handleUpload = async () => {
     if (!preview) return;
     
@@ -58,7 +68,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
       
       console.log('Sending request to analyze portfolio...');
       
-      const response = await fetch('http://localhost:3001/api/analyze-portfolio', {
+      const response = await fetch(`${getApiBaseUrl()}/api/analyze-portfolio`, {
         method: 'POST',
         body: formData,
       });
