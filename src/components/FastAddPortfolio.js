@@ -66,9 +66,16 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
       
       console.log('Sending request to analyze portfolio...');
       
-      // Use relative URL that works in both development and production
-      const apiBaseUrl = process.env.NODE_ENV === 'production' ? '' : ''; // Empty string for relative URL
-      const apiResponse = await fetch(`${apiBaseUrl}/api/analyze-portfolio`, {
+      console.log('Sending request to analyze portfolio...');
+      
+      // Use absolute URL for API endpoint in production, relative in development
+      const isProduction = process.env.NODE_ENV === 'production';
+      const apiBaseUrl = isProduction ? 'https://flowinvest2.vercel.app' : '';
+      const apiUrl = `${apiBaseUrl}/api/analyze-portfolio`;
+      
+      console.log('API URL:', apiUrl);
+      
+      const apiResponse = await fetch(apiUrl, {
         method: 'POST',
         body: formData,
         // Don't set Content-Type header - let the browser set it with the correct boundary
@@ -85,16 +92,30 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         data = JSON.parse(responseText);
       } catch (e) {
         console.error('Failed to parse JSON response:', e);
+        console.error('Response headers:', Object.fromEntries([...apiResponse.headers.entries()]));
         throw new Error(`Invalid JSON response: ${responseText.substring(0, 200)}...`);
       }
       
       console.log('Parsed response data:', data);
+      console.log('Response status:', apiResponse.status);
       
       if (!apiResponse.ok) {
-        console.error('API Error:', data);
-        const errorMessage = data?.error || data?.message || `Server responded with status ${apiResponse.status}`;
-        const errorDetails = data?.details || '';
-        throw new Error(errorDetails ? `${errorMessage}: ${errorDetails}` : errorMessage);
+        console.error('API Error:', {
+          status: apiResponse.status,
+          statusText: apiResponse.statusText,
+          data: data,
+          headers: Object.fromEntries([...apiResponse.headers.entries()])
+        });
+        
+        let errorMessage = `Server responded with status ${apiResponse.status}`;
+        if (data) {
+          errorMessage = data.error || data.message || JSON.stringify(data);
+          if (data.details) {
+            errorMessage += `: ${data.details}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
       
       // Handle both array and single object responses
