@@ -32,6 +32,7 @@ const InvestmentForm = () => {
 // const theme = useTheme();
   const [loading, setLoading] = useState(false);
   const [analysis, setAnalysis] = useState(null);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     type: '',
     name: '',
@@ -60,10 +61,12 @@ const InvestmentForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.type || !formData.name || !formData.amount || !formData.duration || !formData.date) {
+      setError('Please fill in all required fields');
       return;
     }
 
     setLoading(true);
+    setError(null);
     try {
       const userProfile = JSON.parse(localStorage.getItem('userProfile'));
       if (!userProfile) {
@@ -74,13 +77,17 @@ const InvestmentForm = () => {
       setAnalysis(analysis);
     } catch (error) {
       console.error('Error analyzing investment:', error);
+      let errorMessage = 'An unexpected error occurred';
+      
       if (error.message.includes('API key')) {
-        alert('Please enter your OpenAI API key in the browser prompt or set it in the .env file.');
+        errorMessage = 'Please enter your OpenAI API key in the browser prompt or set it in the .env file.';
       } else if (error.message.includes('Invalid API key')) {
-        alert('Invalid OpenAI API key. Please check your key and try again.');
-      } else {
-        alert(`Failed to analyze investment: ${error.message}`);
+        errorMessage = 'Invalid OpenAI API key. Please check your key and try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -160,6 +167,11 @@ const InvestmentForm = () => {
                 required
                 InputLabelProps={{ shrink: true }}
               />
+              {error && (
+                <Typography color="error" sx={{ mt: 2, mb: 2, p: 2, backgroundColor: 'error.light', borderRadius: 1 }}>
+                  {error}
+                </Typography>
+              )}
               <Button
                 type="submit"
                 variant="contained"
@@ -168,6 +180,7 @@ const InvestmentForm = () => {
                 disabled={loading || !formData.type || !formData.name || !formData.amount || !formData.duration || !formData.date}
                 sx={{
                   mt: 2,
+                  width: '100%',
                 }}
               >
                 {loading ? <CircularProgress size={24} /> : 'Get AI Assessment'}
