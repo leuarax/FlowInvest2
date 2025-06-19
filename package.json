@@ -37,7 +37,6 @@
     ]
   },
   "main": "server.js",
-  "type": "module",
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.27.4",
     "@babel/preset-env": "^7.27.2",
