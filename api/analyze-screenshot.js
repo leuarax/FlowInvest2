@@ -124,6 +124,7 @@ export default async function handler(req, res) {
 
     // Step 1: Extract the raw text from the AI's response.
     let rawResponse = aiResponse.choices[0].message.content;
+    console.log('AI Raw Response:', rawResponse);
     let jsonString = '';
 
     // Step 2: Find the JSON string, handling markdown code blocks.
