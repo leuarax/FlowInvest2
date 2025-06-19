@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getPortfolioAnalysis } from '../utils/openai';
 import { useTheme } from '@mui/material/styles';
-import { Container, Box, Typography, Button, Grid, Paper, CircularProgress, IconButton } from '@mui/material';
+import { Container, Box, Typography, Button, Grid, Paper, CircularProgress, IconButton, List, ListItem, ListItemText, Divider, Card, CardContent, Modal, Fade, Backdrop } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
+
+const getGradeColor = (grade) => {
+  if (!grade) return 'text.secondary';
+  const upperGrade = grade.toUpperCase();
+  if (upperGrade.startsWith('A')) return 'success.main';
+  if (upperGrade.startsWith('B')) return 'warning.light';
+  if (upperGrade.startsWith('C')) return 'warning.main';
+  if (upperGrade.startsWith('D')) return 'error.light';
+  if (upperGrade.startsWith('F')) return 'error.main';
+  return 'text.primary';
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,6 +27,9 @@ const Dashboard = () => {
     avgRisk: 0,
     investmentCount: 0,
   });
+  const [portfolioAnalysis, setPortfolioAnalysis] = useState(null);
+  const [error, setError] = useState('');
+  const [selectedInvestment, setSelectedInvestment] = useState(null);
 
   useEffect(() => {
     const userProfile = JSON.parse(localStorage.getItem('userProfile'));
@@ -42,6 +57,32 @@ const Dashboard = () => {
 
     setLoading(false);
   }, [navigate]);
+
+  const handleOpenModal = (investment) => {
+    setSelectedInvestment(investment);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedInvestment(null);
+  };
+
+  const handleGetPortfolioAnalysis = async () => {
+    setLoading(true);
+    setError('');
+    setPortfolioAnalysis(null);
+    try {
+      const userProfile = JSON.parse(localStorage.getItem('userProfile'));
+      if (!userProfile) {
+        throw new Error('User profile not found. Please complete onboarding first.');
+      }
+      const analysis = await getPortfolioAnalysis(investments, userProfile);
+      setPortfolioAnalysis(analysis);
+    } catch (err) {
+      setError(err.message || 'An unknown error occurred.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const deleteInvestment = (investment) => {
     if (window.confirm('Are you sure you want to delete this investment?')) {
@@ -92,19 +133,21 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      <Button
-        variant="contained"
-        onClick={() => navigate('/add-investment')}
-        sx={{
-          mb: 4,
-          backgroundColor: theme.palette.primary.main,
-          '&:hover': {
-            backgroundColor: theme.palette.primary.dark,
-          },
-        }}
-      >
-        {investments.length > 0 ? '+ Add New Investment' : '+ Start Your Investment Journey'}
-      </Button>
+      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+        <Button
+          variant="contained"
+          onClick={() => navigate('/add-investment')}
+        >
+          {investments.length > 0 ? '+ Add New Investment' : '+ Start Your Investment Journey'}
+        </Button>
+        <Button 
+          variant="outlined" 
+          onClick={handleGetPortfolioAnalysis} 
+          disabled={loading || investments.length === 0}
+        >
+          {loading && !portfolioAnalysis ? <CircularProgress size={24} /> : 'Get Portfolio Assessment'}
+        </Button>
+      </Box>
 
       <Grid container spacing={3}>
         {statCards.map((card) => (
@@ -138,15 +181,20 @@ const Dashboard = () => {
         </Box>
       ) : (
         <Grid container spacing={3}>
-          {investments.map((investment) => (
-            <Grid item xs={12} md={6} key={investment.name}>
+          {investments.map((investment, index) => (
+            <Grid item xs={12} md={6} key={`${investment.name}-${index}`}>
               <Paper
+                onClick={() => handleOpenModal(investment)}
                 sx={{
                   p: 3,
                   height: '100%',
                   bgcolor: theme.palette.background.paper,
                   boxShadow: 2,
                   position: 'relative',
+                  cursor: 'pointer',
+                  '&:hover': {
+                    boxShadow: 6,
+                  }
                 }}
               >
                 <IconButton
@@ -171,7 +219,7 @@ const Dashboard = () => {
                     Amount: ${investment.amount}
                   </Typography>
                   <Typography variant="subtitle1">
-                    Duration: {investment.duration} years
+                    Holding Time: {investment.duration}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
@@ -196,6 +244,88 @@ const Dashboard = () => {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {selectedInvestment && (
+        <Modal
+          open={!!selectedInvestment}
+          onClose={handleCloseModal}
+          closeAfterTransition
+          BackdropComponent={Backdrop}
+          BackdropProps={{
+            timeout: 500,
+          }}
+        >
+          <Fade in={!!selectedInvestment}>
+            <Box sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 600,
+              bgcolor: 'background.paper',
+              boxShadow: 24,
+              p: 4,
+              borderRadius: 2,
+            }}>
+              <Typography variant="h4" component="h2" gutterBottom>{selectedInvestment.name}</Typography>
+              <Typography variant="h2" sx={{ color: getGradeColor(selectedInvestment.grade), fontWeight: 'bold', textAlign: 'center', mb: 2 }}>
+                {selectedInvestment.grade}
+              </Typography>
+              <Typography variant="h6">Risk Score: {selectedInvestment.riskScore}/10</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{selectedInvestment.riskExplanation}</Typography>
+              <Typography variant="h6" sx={{ mb: 2 }}>Average Estimated ROI: {selectedInvestment.roiEstimate}%</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
+                <Typography variant="body2">Pessimistic: {selectedInvestment.roiScenarios.pessimistic}%</Typography>
+                <Typography variant="body2">Realistic: {selectedInvestment.roiScenarios.realistic}%</Typography>
+                <Typography variant="body2">Optimistic: {selectedInvestment.roiScenarios.optimistic}%</Typography>
+              </Box>
+              <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>Full Analysis:</Typography>
+              <Typography variant="body2">{selectedInvestment.explanation}</Typography>
+              <Button onClick={handleCloseModal} sx={{ mt: 3 }}>Close</Button>
+            </Box>
+          </Fade>
+        </Modal>
+      )}
+
+      {error && <Typography color="error" sx={{ mt: 4 }}>Error: {error}</Typography>}
+
+      {portfolioAnalysis && (
+        <Paper sx={{ mt: 4, p: 3, boxShadow: 3 }}>
+          <Typography variant="h4" gutterBottom>Portfolio Assessment</Typography>
+          <Grid container spacing={4} sx={{ alignItems: 'center' }}>
+            <Grid item xs={12} md={3}>
+              <Box sx={{ textAlign: 'center', p: 2, border: `2px solid ${getGradeColor(portfolioAnalysis.grade)}`, borderRadius: '50%', width: 150, height: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center', mx: 'auto' }}>
+                <Typography variant="h2" component="div" sx={{ color: getGradeColor(portfolioAnalysis.grade), fontWeight: 'bold' }}>
+                  {portfolioAnalysis.grade}
+                </Typography>
+                <Typography variant="subtitle1" color="text.secondary">
+                  Overall Grade
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={9}>
+              <Typography variant="h6">Comprehensive Analysis</Typography>
+              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mt: 1 }}>{portfolioAnalysis.analysis}</Typography>
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 4 }} />
+
+          <Typography variant="h5" gutterBottom>AI Recommendations</Typography>
+          <Grid container spacing={2}>
+            {portfolioAnalysis.recommendations.map((rec, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Card sx={{ height: '100%', boxShadow: 2 }}>
+                  <CardContent>
+                    <Typography variant="h6" component="div">{rec.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">{rec.reason}</Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
       )}
     </Container>
   );

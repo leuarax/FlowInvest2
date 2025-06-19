@@ -2,6 +2,7 @@
   "name": "vibeinvest",
   "version": "0.1.0",
   "private": true,
+  "proxy": "http://localhost:3001",
   "homepage": "/",
   "dependencies": {
     "@emotion/react": "^11.11.3",
@@ -21,6 +22,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "dev:server": "nodemon server.js",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
@@ -33,7 +35,11 @@
     ]
   },
   "devDependencies": {
-    "vercel": "^35.0.0"
+    "vercel": "^35.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemon": "^3.1.0"
   },
 
   "browserslist": {

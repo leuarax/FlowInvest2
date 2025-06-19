@@ -27,33 +27,9 @@ const openai = new OpenAI({
   baseURL: 'https://api.openai.com/v1'
 });
 
-// Test API key by making a simple request
-async function testApiKey() {
-  try {
-    console.log('Testing API key with OpenAI...');
-    const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: "Test API key" }],
-      temperature: 0.7,
-      max_tokens: 10
-    });
-    console.log('API key test successful');
-    console.log('Response:', response);
-    return true;
-  } catch (error) {
-    console.error('API key test failed:', error);
-    console.error('Error details:', error.message);
-    console.error('Stack trace:', error.stack);
-    throw error;
-  }
-}
-
 // Continue with the main export
 module.exports = async (req, res) => {
   try {
-    // Test API key before processing the request
-    await testApiKey();
-    
     console.log('Received investment analysis request');
     console.log('Request body:', req.body);
     
@@ -71,31 +47,37 @@ module.exports = async (req, res) => {
     
     console.log('Generating prompt for investment analysis');
     const prompt = `
-      Analyze the following investment based on the user's profile:
-      
+      As an expert financial analyst, you are analyzing an investment for a client.
+
+      You will be given the user's profile and the investment details. Use this information as follows:
+
+      1.  **Grade**: Determine the investment 'grade' (e.g., A+, B-, C) by comparing the investment to the user's profile (their experience, risk tolerance, and interests). A grade of 'A' means it's a perfect match for them, while a grade of 'F' means it's a very poor fit.
+      2.  **Risk, ROI, and Explanation**: The rest of your analysis (riskScore, roiEstimate, explanation) should be based *only* on the investment's own characteristics, disregarding the user's profile.
+      3.  **Explanation Tone**: In your explanation, address the user directly.
+
       User Profile:
       - Experience: ${userProfile.experience}
       - Risk Tolerance: ${userProfile.riskTolerance}
       - Interests: ${userProfile.interests.join(', ')}
-      
+      - Investment Goal: ${userProfile.primaryGoal}
+
       Investment Details:
       - Type: ${investmentData.type}
       - Name: ${investmentData.name}
       - Amount: $${investmentData.amount}
-      - Duration: ${investmentData.duration} years
+      - Holding Time: ${investmentData.duration}
       - Start Date: ${investmentData.date}
-      
-      Please provide:
-      1. A risk score (1-10) based on the investment characteristics and user's risk tolerance
-      2. An estimated ROI percentage for the given duration
-      3. A detailed explanation of the investment's risk profile and potential returns
-      
-      Format the response as JSON with the following structure:
-      {
-        "riskScore": number,
-        "roiEstimate": number,
-        "explanation": string
-      }
+
+      Please provide the following in a single JSON object:
+      - "grade": The letter grade based on the match with the user's profile.
+      - "riskScore": A numerical risk score from 1 (very low risk) to 10 (very high risk). Your calculation must follow these rules:
+          - **Asset Class**: Bonds, Real Estate, and Commodities should generally receive lower risk scores than equities.
+          - **Company Maturity**: Well-established, large-cap companies (e.g., 'blue-chip' stocks) should have lower risk scores than new startups or highly volatile assets.
+      - "riskExplanation": A brief, one-sentence explanation for the assigned risk score, justifying the number based on the asset class or company maturity.
+      - "roiScenarios": A JSON object containing three ROI estimates for different market conditions: "pessimistic", "realistic", and "optimistic".
+      - "roiEstimate": The average of the three ROI scenarios, calculated as (pessimistic + realistic + optimistic) / 3.
+      - "explanation": A detailed, multi-sentence explanation of your overall analysis. Address the user directly and explain your reasoning for the grade and ROI.
+
     `;
 
     console.log('Sending request to OpenAI');
@@ -106,7 +88,8 @@ module.exports = async (req, res) => {
         { role: "user", content: prompt }
       ],
       temperature: 0.7,
-      max_tokens: 1000
+      max_tokens: 1000,
+      response_format: { type: "json_object" }
     });
 
     console.log('Received OpenAI response');
@@ -118,26 +101,11 @@ module.exports = async (req, res) => {
     try {
       analysis = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('Error parsing OpenAI response:', parseError);
-      // If parsing fails, try to extract the JSON manually
-      const jsonMatch = responseText.match(/\{.*\}/s);
-      if (jsonMatch) {
-        try {
-          analysis = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          console.error('Failed to parse extracted JSON:', e);
-          return res.status(500).json({ 
-            error: 'Failed to parse analysis response',
-            rawResponse: responseText,
-            extractedJson: jsonMatch[0]
-          });
-        }
-      } else {
-        return res.status(500).json({ 
-          error: 'Failed to parse analysis response',
-          rawResponse: responseText
-        });
-      }
+      console.error('Error parsing OpenAI JSON response:', parseError);
+      return res.status(500).json({ 
+        error: 'Failed to parse analysis response from OpenAI',
+        rawResponse: responseText
+      });
     }
 
     console.log('Successfully parsed analysis:', analysis);

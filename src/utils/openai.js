@@ -47,3 +47,25 @@ export const getInvestmentAnalysis = async (investmentData, userProfile) => {
     throw new Error(`Failed to get investment analysis: ${error.message}`);
   }
 };
+
+export const getPortfolioAnalysis = async (investments, userProfile) => {
+  try {
+    const response = await fetch('/api/portfolio', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ investments, userProfile }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Portfolio analysis failed');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error in getPortfolioAnalysis:', error);
+    throw error;
+  }
+};

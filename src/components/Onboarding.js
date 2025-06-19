@@ -13,6 +13,7 @@ import {
   Checkbox,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { interestOptions } from '../utils/constants';
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ const Onboarding = () => {
     experience: '',
     riskTolerance: '',
     interests: [],
+    primaryGoal: '',
   });
 
   const experienceOptions = [
@@ -37,16 +39,7 @@ const Onboarding = () => {
     { value: 'aggressive', label: 'Aggressive', description: 'Growth-focused, high risk tolerance' },
   ];
 
-  const interestOptions = [
-    'Stocks & ETFs',
-    'Cryptocurrency',
-    'Real Estate',
-    'ESG/Sustainable',
-    'Bonds',
-    'Commodities',
-    'International Markets',
-    'Technology Sector',
-  ];
+
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -56,29 +49,46 @@ const Onboarding = () => {
     });
   };
 
-  const handleNext = () => {
-    if (currentStep === 0 && !formData.name) return;
-    if (currentStep === 1 && !formData.experience) return;
-    if (currentStep === 2 && !formData.riskTolerance) return;
-    if (currentStep === 3 && formData.interests.length === 0) return;
+  const [submitted, setSubmitted] = useState(false);
 
+  const handleNext = () => {
+    // --- FINAL STEP LOGIC ---
     if (currentStep === 3) {
+      setSubmitted(true); // Set submitted to true to trigger validation UI
+
+      if (formData.interests.length === 0) {
+        alert('Please select at least one interest.');
+        return; // Stop if interests are not selected
+      }
+      if (!formData.primaryGoal) {
+        return; // Stop if goal is empty, UI will show error
+      }
+      
+      // All validation passed, proceed to finish
       setLoading(true);
       try {
         localStorage.setItem('userProfile', JSON.stringify(formData));
         navigate('/dashboard');
       } catch (error) {
         console.error('Error saving profile:', error);
-      } finally {
         setLoading(false);
       }
-    } else {
-      setCurrentStep(currentStep + 1);
+      return;
     }
+
+    // --- INTERMEDIATE STEP LOGIC ---
+    // No visual validation, just prevent moving forward silently
+    if (currentStep === 0 && !formData.name) return;
+    if (currentStep === 1 && !formData.experience) return;
+    if (currentStep === 2 && !formData.riskTolerance) return;
+
+    // If validation for intermediate step passed, move to next step
+    setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
+      setSubmitted(false); // Always reset validation state on going back
       setCurrentStep(currentStep - 1);
     }
   };
@@ -220,12 +230,16 @@ const Onboarding = () => {
             </Box>
             <TextField
               fullWidth
-              name="goal"
-              label="Primary Investment Goal"
-              placeholder="Retirement planning, wealth building..."
+              label="Tell us everything about your investing (The more detail the better the results)"
+              name="primaryGoal"
+              value={formData.primaryGoal}
+              onChange={handleInputChange}
               multiline
-              rows={3}
+              rows={4}
               sx={{ mb: 4 }}
+              required
+              error={submitted && !formData.primaryGoal}
+              helperText={submitted && !formData.primaryGoal ? 'This field is required.' : ''}
             />
           </Box>
         );

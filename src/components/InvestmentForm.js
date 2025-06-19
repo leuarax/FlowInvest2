@@ -3,13 +3,29 @@ import { useNavigate } from 'react-router-dom';
 // // import { useTheme } from '@mui/material/styles';
 import { Container, Box, Typography, TextField, Button, FormControl, InputLabel, Select, MenuItem, Grid, Paper, CircularProgress } from '@mui/material';
 import { getInvestmentAnalysis } from '../utils/openai';
+import { interestOptions } from '../utils/constants';
 
-const investmentTypes = [
-  { value: 'stocks', label: 'Stocks' },
-  { value: 'crypto', label: 'Cryptocurrency' },
-  { value: 'realEstate', label: 'Real Estate' },
-  { value: 'esg', label: 'ESG Investments' },
+const investmentTypes = interestOptions.map(option => ({
+  value: option,
+  label: option,
+}));
+
+const holdingTimeOptions = [
+  { value: 'Short-term', label: 'Short-term (1-3 years)' },
+  { value: 'Mid-term', label: 'Mid-term (3-7 years)' },
+  { value: 'Long-term', label: 'Long-term (7+ years)' },
 ];
+
+const getGradeColor = (grade) => {
+  if (!grade) return 'text.secondary';
+  const upperGrade = grade.toUpperCase();
+  if (upperGrade.startsWith('A')) return 'success.main';
+  if (upperGrade.startsWith('B')) return 'warning.light';
+  if (upperGrade.startsWith('C')) return 'warning.main';
+  if (upperGrade.startsWith('D')) return 'error.light';
+  if (upperGrade.startsWith('F')) return 'error.main';
+  return 'text.primary';
+};
 
 const InvestmentForm = () => {
   const navigate = useNavigate();
@@ -117,16 +133,22 @@ const InvestmentForm = () => {
                 sx={{ mb: 3 }}
                 required
               />
-              <TextField
-                fullWidth
-                label="Duration (Years)"
-                name="duration"
-                value={formData.duration}
-                onChange={handleInputChange}
-                type="number"
-                sx={{ mb: 3 }}
-                required
-              />
+              <FormControl fullWidth sx={{ mb: 3 }}>
+                <InputLabel>Holding Time</InputLabel>
+                <Select
+                  value={formData.duration}
+                  onChange={handleInputChange}
+                  name="duration"
+                  label="Holding Time"
+                  required
+                >
+                  {holdingTimeOptions.map((option) => (
+                    <MenuItem key={option.value} value={option.value}>
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField
                 fullWidth
                 label="Investment Date"
@@ -160,6 +182,14 @@ const InvestmentForm = () => {
             </Typography>
             {analysis ? (
               <Box>
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography variant="h1" component="div" sx={{ color: getGradeColor(analysis.grade), fontWeight: 'bold' }}>
+                    {analysis.grade}
+                  </Typography>
+                  <Typography variant="subtitle1" color="text.secondary">
+                    Overall Grade
+                  </Typography>
+                </Box>
                 <Typography variant="h6" sx={{ mb: 2 }}>
                   Risk Analysis
                 </Typography>
