@@ -5,7 +5,7 @@ const path = require('path');
 const multer = require('multer');
 const investmentHandler = require('./api/investment.js');
 const portfolioHandler = require('./api/portfolio.js');
-const { upload, analyzeScreenshot } = require('./api/screenshot.js');
+const analyzeScreenshotHandler = require('./api/analyze-screenshot.js');
 const batchScreenshotHandler = require('./api/batch-screenshot.js');
 
 const app = express();
@@ -26,8 +26,8 @@ app.post('/api/portfolio', (req, res, next) => {
 });
 
 // Screenshot analysis endpoints
-app.post('/api/analyze-screenshot', upload.single('screenshot'), (req, res, next) => {
-  analyzeScreenshot(req, res).catch(next);
+app.post('/api/analyze-screenshot', (req, res, next) => {
+  analyzeScreenshotHandler(req, res).catch(next);
 });
 
 // Batch portfolio analysis endpoint

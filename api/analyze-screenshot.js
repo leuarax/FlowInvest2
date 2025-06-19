@@ -1,7 +1,7 @@
-import { OpenAI } from 'openai';
-import multer from 'multer';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
+const { OpenAI } = require('openai');
+const multer = require('multer');
+const fs = require('fs');
+const { v4: uuidv4 } = require('uuid');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -32,7 +32,7 @@ const runMiddleware = (req, res, fn) => {
 };
 
 // The main serverless function
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
