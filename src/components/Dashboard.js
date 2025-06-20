@@ -390,6 +390,7 @@ const Dashboard = () => {
               borderRadius: 2,
               maxHeight: '90vh',
               overflowY: 'auto',
+              wordWrap: 'break-word',
             }}>
               <Typography variant="h4" component="h2" gutterBottom sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}>{selectedInvestment.name}</Typography>
               <Typography variant="h2" sx={{ color: getGradeColor(selectedInvestment.grade), fontWeight: 'bold', textAlign: 'center', mb: 2, fontSize: { xs: '3rem', sm: '3.75rem' } }}>
