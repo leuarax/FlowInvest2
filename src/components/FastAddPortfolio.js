@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Button,
   Dialog,
@@ -27,6 +27,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState('');
+  const fileInputRef = useRef(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -158,16 +159,20 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
               id="portfolio-upload"
               type="file"
               onChange={handleFileChange}
+              ref={fileInputRef}
             />
-            <label htmlFor="portfolio-upload">
-              <Box display="flex" flexDirection="column" alignItems="center">
-                <CloudUploadIcon sx={{ fontSize: 48, mb: 2, color: 'text.secondary' }} />
-                <Typography variant="h6">Upload Portfolio Screenshot</Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Upload a screenshot of your portfolio to quickly add multiple investments
-                </Typography>
-              </Box>
-            </label>
+            <Box 
+              display="flex" 
+              flexDirection="column" 
+              alignItems="center"
+              onClick={() => fileInputRef.current.click()}
+            >
+              <CloudUploadIcon sx={{ fontSize: 48, mb: 2, color: 'text.secondary' }} />
+              <Typography variant="h6">Upload Portfolio Screenshot</Typography>
+              <Typography variant="body2" color="textSecondary">
+                Click here to upload a screenshot of your portfolio
+              </Typography>
+            </Box>
           </Box>
         ) : (
           <Box>

@@ -386,8 +386,10 @@ const Dashboard = () => {
               width: { xs: '90%', sm: 600 },
               bgcolor: 'background.paper',
               boxShadow: 24,
-              p: 4,
+              p: { xs: 2, sm: 4 },
               borderRadius: 2,
+              maxHeight: '90vh',
+              overflowY: 'auto',
             }}>
               <Typography variant="h4" component="h2" gutterBottom sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}>{selectedInvestment.name}</Typography>
               <Typography variant="h2" sx={{ color: getGradeColor(selectedInvestment.grade), fontWeight: 'bold', textAlign: 'center', mb: 2, fontSize: { xs: '3rem', sm: '3.75rem' } }}>
@@ -398,16 +400,19 @@ const Dashboard = () => {
               <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                 Average Estimated ROI: {formatROI(selectedInvestment.roiEstimate)}%
               </Typography>
-              <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
-                <Typography variant="body2">
-                  Pessimistic: {formatROI(selectedInvestment.roiScenarios.pessimistic)}%
-                </Typography>
-                <Typography variant="body2">
-                  Realistic: {formatROI(selectedInvestment.roiScenarios.realistic)}%
-                </Typography>
-                <Typography variant="body2">
-                  Optimistic: {formatROI(selectedInvestment.roiScenarios.optimistic)}%
-                </Typography>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-around', mb: 2, alignItems: 'center', gap: { xs: 2, sm: 0 } }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: { xs: '0.9rem', sm: '1rem' } }}>Pessimistic</Typography>
+                  <Typography variant="h6" color="error.main" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>{formatROI(selectedInvestment.roiScenarios?.pessimistic)}%</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: { xs: '0.9rem', sm: '1rem' } }}>Realistic</Typography>
+                  <Typography variant="h6" color="warning.main" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>{formatROI(selectedInvestment.roiScenarios?.realistic)}%</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', fontSize: { xs: '0.9rem', sm: '1rem' } }}>Optimistic</Typography>
+                  <Typography variant="h6" color="success.main" sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>{formatROI(selectedInvestment.roiScenarios?.optimistic)}%</Typography>
+                </Box>
               </Box>
               <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 1 }}>Full Analysis:</Typography>
               <Typography variant="body2">{selectedInvestment.explanation}</Typography>
