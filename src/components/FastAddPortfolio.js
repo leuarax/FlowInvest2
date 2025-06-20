@@ -158,7 +158,6 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
               id="portfolio-upload"
               type="file"
               onChange={handleFileChange}
-              capture="environment"
             />
             <label htmlFor="portfolio-upload">
               <Box display="flex" flexDirection="column" alignItems="center">

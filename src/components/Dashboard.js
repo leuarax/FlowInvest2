@@ -389,13 +389,13 @@ const Dashboard = () => {
               p: 4,
               borderRadius: 2,
             }}>
-              <Typography variant="h4" component="h2" gutterBottom>{selectedInvestment.name}</Typography>
-              <Typography variant="h2" sx={{ color: getGradeColor(selectedInvestment.grade), fontWeight: 'bold', textAlign: 'center', mb: 2 }}>
+              <Typography variant="h4" component="h2" gutterBottom sx={{ fontSize: { xs: '1.75rem', sm: '2.125rem' } }}>{selectedInvestment.name}</Typography>
+              <Typography variant="h2" sx={{ color: getGradeColor(selectedInvestment.grade), fontWeight: 'bold', textAlign: 'center', mb: 2, fontSize: { xs: '3rem', sm: '3.75rem' } }}>
                 {selectedInvestment.grade}
               </Typography>
-              <Typography variant="h6">Risk Score: {selectedInvestment.riskScore}/10</Typography>
+              <Typography variant="h6" sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>Risk Score: {selectedInvestment.riskScore}/10</Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>{selectedInvestment.riskExplanation}</Typography>
-              <Typography variant="h6" sx={{ mb: 2 }}>
+              <Typography variant="h6" sx={{ mb: 2, fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                 Average Estimated ROI: {formatROI(selectedInvestment.roiEstimate)}%
               </Typography>
               <Box sx={{ display: 'flex', justifyContent: 'space-around', mb: 2 }}>
