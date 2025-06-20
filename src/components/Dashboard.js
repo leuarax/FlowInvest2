@@ -228,7 +228,7 @@ const Dashboard = () => {
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h1" component="h1" sx={{ mb: 1, color: theme.palette.primary.main }}>
+        <Typography variant="h1" component="h1" sx={{ mb: 1, color: theme.palette.primary.main, fontSize: { xs: '3rem', sm: '4rem', md: '5rem' } }}>
           FlowInvest
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
@@ -236,7 +236,7 @@ const Dashboard = () => {
         </Typography>
       </Box>
 
-      <Box sx={{ mb: 4, display: 'flex', gap: 2 }}>
+      <Box sx={{ mb: 4, display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
         <Button 
           variant="contained" 
           color="primary" 
@@ -292,7 +292,7 @@ const Dashboard = () => {
         ))}
       </Grid>
 
-      <Typography variant="h4" sx={{ mb: 3, mt: 4 }}>
+      <Typography variant="h4" sx={{ mb: 3, mt: 4, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
         Your Investments
       </Typography>
 
@@ -383,7 +383,7 @@ const Dashboard = () => {
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              width: 600,
+              width: { xs: '90%', sm: 600 },
               bgcolor: 'background.paper',
               boxShadow: 24,
               p: 4,
