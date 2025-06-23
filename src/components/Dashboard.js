@@ -5,7 +5,7 @@ import { useTheme } from '@mui/material/styles';
 import { 
   Container, Box, Typography, Button, Grid, Paper, 
   CircularProgress, IconButton, Divider, Card, 
-  CardContent, Modal, Fade, Backdrop, Tooltip 
+  CardContent, Modal, Fade, Backdrop, Tooltip, Chip 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -330,9 +330,12 @@ const Dashboard = () => {
                 >
                   <DeleteIcon />
                 </IconButton>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  {investment.name}
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    {investment.name}
+                  </Typography>
+                  <Chip label={investment.grade} sx={{ backgroundColor: getGradeColor(investment.grade), color: 'white' }} />
+                </Box>
                 <Typography variant="subtitle1" sx={{ mb: 2 }}>
                   Type: {investment.type}
                 </Typography>
