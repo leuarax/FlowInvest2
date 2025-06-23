@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, Box, Typography, TextField, Button, 
-  Grid, Paper, CircularProgress
+  Grid, Paper, CircularProgress, Alert, LinearProgress
 } from '@mui/material';
 
 // Utility function to determine color based on grade
