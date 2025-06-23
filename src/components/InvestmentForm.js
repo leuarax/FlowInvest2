@@ -22,7 +22,6 @@ const getGradeColor = (grade) => {
 
 const InvestmentForm = () => {
   const navigate = useNavigate();
-  const [inputMethod, setInputMethod] = useState('screenshot');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analysis, setAnalysis] = useState(null);
@@ -32,22 +31,6 @@ const InvestmentForm = () => {
   const [filePreview, setFilePreview] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
 
-  // State for manual input
-  const [formData, setFormData] = useState({
-    name: '',
-    type: '',
-    amount: '',
-    date: '',
-  });
-
-  const handleInputMethodChange = (event, newMethod) => {
-    if (newMethod !== null) {
-      setInputMethod(newMethod);
-      setAnalysis(null);
-      setError(null);
-    }
-  };
-
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
@@ -56,31 +39,22 @@ const InvestmentForm = () => {
     }
   };
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
     setAnalysis(null);
 
+    if (!file) {
+      setError('Please upload a screenshot.');
+      setLoading(false);
+      return;
+    }
+
     const apiFormData = new FormData();
     const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
     apiFormData.append('userProfile', JSON.stringify(userProfile));
     apiFormData.append('additionalNotes', additionalNotes);
-
-    if (inputMethod === 'screenshot') {
-      if (!file) {
-        setError('Please upload a screenshot.');
-        setLoading(false);
-        return;
-      }
-      apiFormData.append('screenshot', file);
-    } else {
-      apiFormData.append('manualData', JSON.stringify(formData));
-    }
+    apiFormData.append('screenshot', file);
 
     try {
       const res = await fetch('/api/analyze-screenshot', {
@@ -108,10 +82,10 @@ const InvestmentForm = () => {
 
     const newInvestment = {
       id: Date.now(),
-      name: analysis.name || formData.name,
-      type: analysis.type || formData.type,
-      amount: analysis.amount || formData.amount,
-      purchaseDate: formData.date,
+      name: analysis.name || 'N/A',
+      type: analysis.type || 'N/A',
+      amount: analysis.amount || 'N/A',
+      purchaseDate: new Date().toISOString().split('T')[0],
       quantity: analysis.quantity || '',
       ticker: analysis.ticker || '',
       additionalNotes: additionalNotes,
@@ -135,91 +109,47 @@ const InvestmentForm = () => {
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 3, height: '100%' }}>
             <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-              Add New Investment
+              Analyze a New Investment
             </Typography>
-
-            <ToggleButtonGroup
-              value={inputMethod}
-              exclusive
-              onChange={handleInputMethodChange}
-              aria-label="input method"
-              fullWidth
-              sx={{ mb: 3 }}
-            >
-              <ToggleButton value="screenshot" aria-label="screenshot upload">
-                <CameraAltIcon sx={{ mr: 1 }} />
-                Screenshot
-              </ToggleButton>
-              <ToggleButton value="manual" aria-label="manual entry">
-                <EditIcon sx={{ mr: 1 }} />
-                Manual Entry
-              </ToggleButton>
-            </ToggleButtonGroup>
-
-            {inputMethod === 'screenshot' ? (
-              <Box>
-                <Button
-                  variant="contained"
-                  component="label"
-                  fullWidth
-                  sx={{ mb: 2, py: 1.5 }}
-                >
-                  Upload Screenshot
-                  <input type="file" hidden onChange={handleFileChange} accept="image/*" />
-                </Button>
-                {filePreview && (
-                  <Box sx={{ mb: 2, border: '1px dashed grey', p: 1 }}>
-                    <img src={filePreview} alt="Screenshot preview" style={{ width: '100%', height: 'auto' }} />
-                  </Box>
-                )}
-                <TextField
-                  label="Additional Notes (Optional)"
-                  multiline
-                  rows={4}
-                  fullWidth
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
-                  sx={{ mb: 2 }}
-                />
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={handleAnalyze}
-                  disabled={!file || loading}
-                  fullWidth
-                  sx={{ py: 1.5, fontWeight: 'bold' }}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Analyze Screenshot'}
-                </Button>
-              </Box>
-            ) : (
-              <Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Investment Name" name="name" value={formData.name} onChange={handleFormChange} fullWidth required />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Investment Type" name="type" value={formData.type} onChange={handleFormChange} fullWidth required />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Amount Invested" name="amount" type="number" value={formData.amount} onChange={handleFormChange} fullWidth required />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField label="Purchase Date" name="date" type="date" value={formData.date} onChange={handleFormChange} fullWidth InputLabelProps={{ shrink: true }} required />
-                  </Grid>
-                </Grid>
-                <Button
-                  variant="contained"
-                  color="secondary"
-                  onClick={handleAnalyze}
-                  disabled={loading}
-                  fullWidth
-                  sx={{ mt: 3, py: 1.5, fontWeight: 'bold' }}
-                >
-                  {loading ? <CircularProgress size={24} /> : 'Get AI Assessment'}
-                </Button>
-              </Box>
-            )}
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Upload a screenshot of a single investment you are considering. This could be from your broker, a news article, or any other source. Our AI will analyze it for you.
+            </Typography>
+            
+            <Box>
+              <Button
+                variant="contained"
+                component="label"
+                fullWidth
+                sx={{ mb: 2, py: 1.5 }}
+              >
+                Upload Screenshot
+                <input type="file" hidden onChange={handleFileChange} accept="image/*" />
+              </Button>
+              {filePreview && (
+                <Box sx={{ mb: 2, border: '1px dashed grey', p: 1 }}>
+                  <img src={filePreview} alt="Screenshot preview" style={{ width: '100%', height: 'auto' }} />
+                </Box>
+              )}
+              <TextField
+                label="Additional Notes (Optional)"
+                multiline
+                rows={4}
+                fullWidth
+                value={additionalNotes}
+                onChange={(e) => setAdditionalNotes(e.target.value)}
+                sx={{ mb: 2 }}
+              />
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={handleAnalyze}
+                disabled={!file || loading}
+                fullWidth
+                sx={{ py: 1.5, fontWeight: 'bold' }}
+              >
+                {loading ? <CircularProgress size={24} /> : 'Analyze Screenshot'}
+              </Button>
+            </Box>
           </Paper>
         </Grid>
 
@@ -295,15 +225,13 @@ const InvestmentForm = () => {
                   sx={{ mt: 3, py: 1.5, fontWeight: 'bold' }}
                   fullWidth
                 >
-                  Save Investment
+                  Save Investment to Portfolio
                 </Button>
               </Box>
             ) : (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'text.secondary' }}>
                 <Typography variant="body1">
-                  {inputMethod === 'screenshot' 
-                    ? 'Upload a screenshot to begin analysis.'
-                    : 'Fill in the form to get an AI assessment.'}
+                  Upload a screenshot of an investment to begin analysis.
                 </Typography>
               </Box>
             )}

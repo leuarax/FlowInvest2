@@ -40,13 +40,14 @@ const upload = multer({
       cb(null, `${uuidv4()}-${file.originalname}`);
     },
   }),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
 });
 
-// Middleware to handle multipart/form-data
+// Middleware to handle multipart/form-data for multiple files
 const uploadMiddleware = (req, res) => {
   return new Promise((resolve, reject) => {
-    upload.single('screenshot')(req, res, (err) => {
+    // Use 'array' to handle multiple files. 'screenshots' is the field name. 10 is the max count.
+    upload.array('screenshots', 10)(req, res, (err) => {
       if (err) {
         reject(err);
       } else {
@@ -73,7 +74,7 @@ module.exports = async function handler(req, res) {
   try {
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // In production, restrict this to your frontend's domain
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
     res.setHeader(
       'Access-Control-Allow-Headers',
@@ -96,7 +97,7 @@ module.exports = async function handler(req, res) {
     try {
       console.log('Starting file upload handling');
       
-      // Handle file upload
+      // Handle file uploads
       try {
         await uploadMiddleware(req, res);
       } catch (uploadError) {
@@ -104,30 +105,39 @@ module.exports = async function handler(req, res) {
         return sendError(res, 400, 'File upload failed', uploadError.message);
       }
       
-      if (!req.file) {
-        console.error('No file in request');
-        return sendError(res, 400, 'No file uploaded', 'Please upload a screenshot file with the key "screenshot"');
+      if (!req.files || req.files.length === 0) {
+        console.error('No files in request');
+        return sendError(res, 400, 'No files uploaded', 'Please upload one or more screenshot files with the key "screenshots"');
       }
       
-      console.log('File uploaded successfully:', req.file);
+      console.log(`Files uploaded successfully: ${req.files.length} files`);
 
-      console.log('Processing file:', req.file.path);
-      
-      // Read the uploaded file
-      const imageBuffer = await fs.readFile(req.file.path);
-      const base64Image = imageBuffer.toString('base64');
-      
-      // Clean up the file
-      try {
-        await fs.unlink(req.file.path);
-        console.log('Temporary file cleaned up');
-      } catch (cleanupError) {
-        console.warn('Could not delete temporary file:', cleanupError);
+      const imageContents = [];
+      for (const file of req.files) {
+          console.log('Processing file:', file.path);
+          const imageBuffer = await fs.readFile(file.path);
+          const base64Image = imageBuffer.toString('base64');
+          imageContents.push({
+              type: "image_url",
+              image_url: {
+                  url: `data:image/png;base64,${base64Image}`,
+              },
+          });
+      }
+
+      // Clean up the files
+      for (const file of req.files) {
+          try {
+              await fs.unlink(file.path);
+              console.log(`Temporary file cleaned up: ${file.path}`);
+          } catch (cleanupError) {
+              console.warn(`Could not delete temporary file: ${file.path}`, cleanupError);
+          }
       }
       
       console.log('Calling OpenAI API...');
       
-      // Call OpenAI API with the image
+      // Call OpenAI API with the images
       let response;
       try {
         response = await openai.chat.completions.create({
@@ -136,45 +146,20 @@ module.exports = async function handler(req, res) {
           messages: [
             {
               role: "system",
-              content: "You are a helpful assistant that analyzes portfolio screenshots and returns investment data in a specific JSON format."
+              content: "You are a helpful assistant that analyzes portfolio screenshots and returns investment data in a specific JSON format. Consolidate all investments from all provided images into a single list."
             },
             {
               role: "user",
               content: [
                 { 
                   type: "text", 
-                  text: `Analyze this portfolio screenshot and return a JSON object with an 'investments' array. Each investment should have: name, type (Stock, Crypto, etc.), amount (current value), and purchaseDate. 
-                  
-                  Example format: 
-                  {
-                    "investments": [
-                      {
-                        "name": "Apple Inc.",
-                        "type": "Stock",
-                        "amount": 1500.50,
-                        "purchaseDate": "2023-01-15"
-                      },
-                      {
-                        "name": "Bitcoin",
-                        "type": "Crypto",
-                        "amount": 0.5,
-                        "purchaseDate": "2022-11-01"
-                      }
-                    ]
-                  }
-                  
-                  Only return the JSON object with no additional text or markdown formatting.`
+                  text: `Analyze these portfolio screenshots and return a single JSON object with an 'investments' array. Each investment should have: name, type (Stock, Crypto, etc.), and amount (current value). Consolidate all investments from all images into this single array.\n                  \n                  Example format: \n                  {\n                    "investments": [\n                      {\n                        "name": "Apple Inc.",\n                        "type": "Stock",\n                        "amount": 1500.50\n                      },\n                      {\n                        "name": "Bitcoin",\n                        "type": "Crypto",\n                        "amount": 2300.75\n                      }\n                    ]\n                  }\n                  \n                  Only return the JSON object with no additional text or markdown formatting.`
                 },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:image/png;base64,${base64Image}`,
-                  },
-                },
+                ...imageContents, // Spread the array of image objects
               ],
             },
           ],
-          max_tokens: 2000,
+          max_tokens: 4000,
           temperature: 0.3,
         });
       } catch (apiError) {
@@ -242,7 +227,7 @@ module.exports = async function handler(req, res) {
       if (cleanedInvestments.length === 0) {
         return res.status(400).json({ 
           error: 'No valid investments found',
-          details: 'Could not extract any valid investments from the image'
+          details: 'Could not extract any valid investments from the image(s)'
         });
       }
       

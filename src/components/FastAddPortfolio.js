@@ -20,41 +20,55 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
+import ClearIcon from '@mui/icons-material/Clear';
 
 export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
   const [selected, setSelected] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState('');
-  
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    const updatedFiles = [...files, ...newFiles];
+    setFiles(updatedFiles);
+
+    const newPreviews = [];
+    let loadedCount = 0;
+    newFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            newPreviews.push(reader.result);
+            loadedCount++;
+            if (loadedCount === newFiles.length) {
+                setPreviews(prev => [...prev, ...newPreviews]);
+            }
+        };
+        reader.readAsDataURL(file);
+    });
 
     setInvestments([]);
     setSelected([]);
     setError('');
+    // Reset the file input value to allow selecting the same file again
+    e.target.value = null;
   };
 
   const handleUpload = async () => {
-    if (!preview) return;
+    if (files.length === 0) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(preview);
-      const blob = await response.blob();
       const formData = new FormData();
-      formData.append('screenshot', blob, 'portfolio.png');
+      files.forEach((file) => {
+        formData.append('screenshots', file);
+      });
 
       const makeRequest = async (url) => {
         const res = await fetch(url, {
@@ -119,12 +133,17 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     onAddInvestments(selectedInvestments);
     handleClose();
   };
-
-  const handleClose = () => {
-    setPreview('');
+  
+  const handleClear = () => {
+    setFiles([]);
+    setPreviews([]);
     setInvestments([]);
     setSelected([]);
     setError('');
+  };
+
+  const handleClose = () => {
+    handleClear();
     onClose();
   };
 
@@ -139,100 +158,111 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         </Box>
       </DialogTitle>
       <DialogContent>
-        {!preview ? (
-          <Box sx={{ textAlign: 'center', p: 4 }}>
+          <Box sx={{ textAlign: 'center', p: previews.length === 0 ? 4 : 2 }}>
               <Button
                 variant="contained"
                 component="label"
                 startIcon={<CloudUploadIcon />}
-                sx={{ py: 1.5, px: 4 }}
+                sx={{ py: 1.5, px: 4, mb: 2 }}
               >
-                Upload Screenshot
+                Upload Screenshot(s)
                 <input 
                   type="file" 
+                  multiple
                   hidden 
                   onChange={handleFileChange} 
                   accept="image/*" 
                 />
               </Button>
-              <Typography variant="body2" color="textSecondary" sx={{ mt: 2 }}>
-                Upload a screenshot of your portfolio to quickly add multiple investments.
-              </Typography>
+              {previews.length === 0 && (
+                <Typography variant="body2" color="textSecondary">
+                  Upload one or more screenshots of your portfolio (e.g., from your broker) showing the name and amount of each asset.
+                </Typography>
+              )}
             </Box>
-        ) : (
-          <Box>
-            {preview && (
-              <Box mb={2}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Portfolio Preview:
-                </Typography>
-                <img
-                  src={preview}
-                  alt="Portfolio preview"
-                  style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 4 }}
-                />
-              </Box>
-            )}
 
-            {loading ? (
-              <Box display="flex" justifyContent="center" my={4}>
-                <CircularProgress />
+          {previews.length > 0 && (
+            <Box>
+              <Box mb={2}>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Typography variant="subtitle2" gutterBottom>
+                    Portfolio Previews:
+                  </Typography>
+                  <Button startIcon={<ClearIcon />} onClick={handleClear} size="small">
+                    Clear All
+                  </Button>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', p: 1, border: '1px solid #ddd', borderRadius: 1 }}>
+                  {previews.map((previewUrl, index) => (
+                    <img
+                      key={index}
+                      src={previewUrl}
+                      alt={`Portfolio preview ${index + 1}`}
+                      style={{ height: '100px', borderRadius: 4 }}
+                    />
+                  ))}
+                </Box>
               </Box>
-            ) : error ? (
-              <Box color="error.main" my={2}>
-                <Typography variant="body2">{error}</Typography>
-              </Box>
-            ) : investments.length > 0 ? (
-              <Box mt={2}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Detected Investments:
-                </Typography>
-                <TableContainer component={Paper} variant="outlined">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={selected.length > 0 && selected.every(Boolean)}
-                            indeterminate={
-                              selected.some(Boolean) && !selected.every(Boolean)
-                            }
-                            onChange={handleSelectAll}
-                          />
-                        </TableCell>
-                        <TableCell>Name</TableCell>
-                        <TableCell>Type</TableCell>
-                        <TableCell align="right">Amount</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {investments.map((investment, index) => (
-                        <TableRow key={index}>
+
+              {loading ? (
+                <Box display="flex" justifyContent="center" my={4}>
+                  <CircularProgress />
+                </Box>
+              ) : error ? (
+                <Box color="error.main" my={2}>
+                  <Typography variant="body2">{error}</Typography>
+                </Box>
+              ) : investments.length > 0 ? (
+                <Box mt={2}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Detected Investments:
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined">
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
                           <TableCell padding="checkbox">
                             <Checkbox
-                              checked={selected[index] || false}
-                              onChange={() => handleSelectOne(index)}
+                              checked={selected.length > 0 && selected.every(Boolean)}
+                              indeterminate={
+                                selected.some(Boolean) && !selected.every(Boolean)
+                              }
+                              onChange={handleSelectAll}
                             />
                           </TableCell>
-                          <TableCell>{investment.name || 'Unknown'}</TableCell>
-                          <TableCell>{investment.type || 'Stock'}</TableCell>
-                          <TableCell align="right">
-                            {typeof investment.amount === 'number'
-                              ? `$${investment.amount.toLocaleString(undefined, {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2
-                                })}`
-                              : investment.amount || 'N/A'}
-                          </TableCell>
+                          <TableCell>Name</TableCell>
+                          <TableCell>Type</TableCell>
+                          <TableCell align="right">Amount</TableCell>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Box>
-            ) : null}
-          </Box>
-        )}
+                      </TableHead>
+                      <TableBody>
+                        {investments.map((investment, index) => (
+                          <TableRow key={index}>
+                            <TableCell padding="checkbox">
+                              <Checkbox
+                                checked={selected[index] || false}
+                                onChange={() => handleSelectOne(index)}
+                              />
+                            </TableCell>
+                            <TableCell>{investment.name || 'Unknown'}</TableCell>
+                            <TableCell>{investment.type || 'Stock'}</TableCell>
+                            <TableCell align="right">
+                              {typeof investment.amount === 'number'
+                                ? `$${investment.amount.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                  })}`
+                                : investment.amount || 'N/A'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              ) : null}
+            </Box>
+          )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} color="inherit">
@@ -247,7 +277,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
           onClick={investments.length > 0 ? handleAddSelected : handleUpload}
           color="primary"
           variant="contained"
-          disabled={loading || (investments.length > 0 && selected.filter(Boolean).length === 0)}
+          disabled={loading || files.length === 0 || (investments.length > 0 && selected.filter(Boolean).length === 0)}
         >
           {loading ? <CircularProgress size={24} /> : (investments.length > 0 ? 'Add Selected' : 'Analyze')}
         </Button>

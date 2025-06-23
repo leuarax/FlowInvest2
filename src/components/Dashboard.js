@@ -237,17 +237,9 @@ const Dashboard = () => {
       </Box>
 
       <Box sx={{ mb: 4, display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={() => navigate('/add-investment')}
-          startIcon={<AddIcon />}
-        >
-          Add Investment
-        </Button>
         <Tooltip title="Quickly add multiple investments from a screenshot">
           <Button 
-            variant="outlined" 
+            variant="contained" 
             color="primary" 
             onClick={() => setFastAddOpen(true)}
             startIcon={<SpeedIcon />}
@@ -261,6 +253,13 @@ const Dashboard = () => {
           disabled={investments.length === 0}
         >
           Analyze Portfolio
+        </Button>
+        <Button 
+          variant="outlined" 
+          color="primary" 
+          onClick={() => navigate('/add-investment')}
+        >
+          Thinking about new investments?
         </Button>
       </Box>
 
