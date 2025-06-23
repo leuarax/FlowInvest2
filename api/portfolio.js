@@ -29,7 +29,7 @@ module.exports = async (req, res) => {
       - **Primary Investment Goal (The most important factor)**: "${userProfile.primaryGoal}"
 
       **User's Current Portfolio (${investments.length} investments):**
-      ${investments.map(inv => `- ${inv.name} ($${inv.amount}, Type: ${inv.type}, Holding Time: ${inv.duration})`).join('\n')}
+      ${investments.map(inv => `- ${inv.name} ($${inv.amount}, Type: ${inv.type})`).join('\n')}
 
       **Your Task:**
       Provide a single, structured JSON object with the following three keys. Your entire analysis MUST be tailored to the user's profile.

@@ -52,12 +52,11 @@ const Dashboard = () => {
     try {
       // Process each new investment to ensure required fields and get analysis
       const processedInvestments = await Promise.all(newInvestments.map(async (inv) => {
-        // Remove holding time if it exists
-        const { holdingTime, ...investmentWithoutHoldingTime } = inv;
+
         
         // Basic investment data
         const baseInvestment = {
-          ...investmentWithoutHoldingTime,
+          ...inv,
           // Ensure required fields have default values
           amount: parseFloat(inv.amount) || 0,
           roiEstimate: inv.roiEstimate || 0,
@@ -147,7 +146,10 @@ const Dashboard = () => {
     // Calculate stats
     if (storedInvestments.length > 0) {
       const total = storedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-      const avgROI = storedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate), 0) / storedInvestments.length;
+      const avgROI = storedInvestments.reduce((acc, inv) => {
+        const roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
+        return acc + (isNaN(roi) ? 0 : roi);
+      }, 0) / storedInvestments.length;
       const avgRisk = storedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / storedInvestments.length;
 
       setStats({
@@ -338,9 +340,7 @@ const Dashboard = () => {
                   <Typography variant="subtitle1">
                     Amount: ${investment.amount}
                   </Typography>
-                  <Typography variant="subtitle1">
-                    Holding Time: {investment.duration}
-                  </Typography>
+
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                   <Typography variant="subtitle1">

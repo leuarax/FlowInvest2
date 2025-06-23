@@ -65,7 +65,7 @@ module.exports = async (req, res) => {
       - Type: ${investmentData.type}
       - Name: ${investmentData.name}
       - Amount: $${investmentData.amount}
-      - Holding Time: ${investmentData.duration}
+
       - Start Date: ${investmentData.date}
 
       Please provide the following in a single JSON object:
@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
           - **Company Maturity**: Well-established, large-cap companies (e.g., 'blue-chip' stocks) should have lower risk scores than new startups or highly volatile assets.
       - "riskExplanation": A brief, one-sentence explanation for the assigned risk score, justifying the number based on the asset class or company maturity.
       - "roiScenarios": A JSON object containing three ROI estimates for different market conditions: "pessimistic", "realistic", and "optimistic".
-      - "roiEstimate": The average of the three ROI scenarios, calculated as (pessimistic + realistic + optimistic) / 3.
+      - "roiEstimate": A numerical value representing the average of the three ROI scenarios, calculated as (pessimistic + realistic + optimistic) / 3. Do not include a '%' sign.
       - "explanation": A detailed, multi-sentence explanation of your overall analysis. Address the user directly and explain your reasoning for the grade and ROI.
 
     `;
@@ -109,8 +109,15 @@ module.exports = async (req, res) => {
       // Ensure riskScore is a number between 1-10
       analysis.riskScore = Math.max(1, Math.min(10, Number(analysis.riskScore) || 5));
       
-      // Ensure roiEstimate is a number
-      analysis.roiEstimate = Number(analysis.roiEstimate) || 0;
+      // Ensure roiEstimate is a number, parsing it robustly
+      let roiEstimate = 0;
+      if (typeof analysis.roiEstimate === 'string') {
+        // Strip any non-numeric characters (like '%') and parse
+        roiEstimate = parseFloat(analysis.roiEstimate.replace(/[^0-9.-]+/g, ""));
+      } else if (typeof analysis.roiEstimate === 'number') {
+        roiEstimate = analysis.roiEstimate;
+      }
+      analysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
       
     } catch (parseError) {
       console.error('Error parsing OpenAI JSON response:', parseError);
