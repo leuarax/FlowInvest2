@@ -2,11 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, Box, Typography, TextField, Button, 
-  Grid, Paper, CircularProgress, ToggleButton, 
-  ToggleButtonGroup, Alert, LinearProgress
+  Grid, Paper, CircularProgress
 } from '@mui/material';
-import CameraAltIcon from '@mui/icons-material/CameraAlt';
-import EditIcon from '@mui/icons-material/Edit';
 
 // Utility function to determine color based on grade
 const getGradeColor = (grade) => {
