@@ -1,0 +1,75 @@
+{
+  "name": "flowinvest",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@babel/core": "^7.24.0",
+    "@emotion/react": "^11.11.3",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.6",
+    "@mui/material": "^5.15.6",
+    "autoprefixer": "^10.4.17",
+    "axios": "^1.6.7",
+    "multer": "^2.0.1",
+    "openai": "^4.104.0",
+    "postcss": "^8.4.35",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^2.10.3",
+    "tailwindcss": "^3.4.1"
+  },
+  "scripts": {
+    "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "vercel-build": "npm install && npm run build"
+  },
+  "engines": {
+    "node": "18.x"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "main": "server.js",
+  "devDependencies": {
+    "@babel/plugin-transform-runtime": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "@babel/preset-react": "^7.27.1",
+    "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "nodemon": "^3.1.0",
+    "vercel": "^35.0.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "vercel": {
+    "rewrites": [
+      {
+        "source": "/api/(.*)",
+        "destination": "/api/$1"
+      },
+      {
+        "source": "/(.*)",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
