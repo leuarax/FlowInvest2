@@ -122,12 +122,12 @@ const InvestmentForm = () => {
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 3, mb: 2 }}>
             <Typography variant="h6" gutterBottom>
-              Portfolio Analysis
+              Thinking About a New Investment?
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <Typography variant="body1" gutterBottom>
-                  Upload your portfolio screenshot:
+                  Upload a screenshot of your potential investment here:
                 </Typography>
                 <input
                   accept="image/*"

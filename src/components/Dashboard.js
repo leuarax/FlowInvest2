@@ -320,12 +320,13 @@ const Dashboard = () => {
                 }}
               >
                 <IconButton
-                  onClick={() => deleteInvestment(investment)}
+                  onClick={(e) => { e.stopPropagation(); deleteInvestment(investment); }}
                   sx={{
                     position: 'absolute',
                     top: 8,
                     right: 8,
                     color: theme.palette.error.main,
+                    zIndex: 3,
                   }}
                 >
                   <DeleteIcon />
@@ -337,8 +338,10 @@ const Dashboard = () => {
                   <Typography
                     sx={{
                       fontWeight: 'bold',
-                      fontSize: { xs: '2rem', sm: '2.5rem' },
+                      fontSize: { xs: '2.5rem', sm: '3rem' },
                       color: getGradeColor(investment.grade),
+                      textAlign: 'center',
+                      lineHeight: 1,
                       ml: 2,
                     }}
                   >

@@ -26,6 +26,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
   const [selected, setSelected] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
   const [error, setError] = useState('');
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
@@ -128,10 +129,15 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     setSelected(newSelected);
   };
 
-  const handleAddSelected = () => {
-    const selectedInvestments = investments.filter((_, index) => selected[index]);
-    onAddInvestments(selectedInvestments);
-    handleClose();
+  const handleAddSelected = async () => {
+    setAddLoading(true);
+    try {
+      const selectedInvestments = investments.filter((_, index) => selected[index]);
+      await onAddInvestments(selectedInvestments);
+      handleClose();
+    } finally {
+      setAddLoading(false);
+    }
   };
   
   const handleClear = () => {
@@ -148,7 +154,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={addLoading ? undefined : handleClose} maxWidth="md" fullWidth>
       <DialogTitle>
         <Box display="flex" justifyContent="space-between" alignItems="center">
           Fast Add Portfolio
@@ -269,11 +275,11 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
           )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} color="inherit">
+        <Button onClick={handleClose} color="inherit" disabled={addLoading}>
           Cancel
         </Button>
         {investments.length > 0 && (
-          <Button onClick={handleUpload} color="primary" disabled={loading}>
+          <Button onClick={handleUpload} color="primary" disabled={loading || addLoading}>
             Re-analyze
           </Button>
         )}
@@ -281,11 +287,31 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
           onClick={investments.length > 0 ? handleAddSelected : handleUpload}
           color="primary"
           variant="contained"
-          disabled={loading || files.length === 0 || (investments.length > 0 && selected.filter(Boolean).length === 0)}
+          disabled={loading || addLoading || files.length === 0 || (investments.length > 0 && selected.filter(Boolean).length === 0)}
         >
-          {loading ? <CircularProgress size={24} /> : (investments.length > 0 ? 'Add Selected' : 'Analyze')}
+          {(loading || addLoading) ? <CircularProgress size={24} /> : (investments.length > 0 ? 'Add Selected' : 'Analyze')}
         </Button>
       </DialogActions>
+      {addLoading && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            bgcolor: 'rgba(255,255,255,0.7)',
+            zIndex: 1301,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <CircularProgress size={48} />
+          <Typography sx={{ mt: 2 }}>Adding investments...</Typography>
+        </Box>
+      )}
     </Dialog>
   );
 }
