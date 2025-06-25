@@ -5,7 +5,7 @@ import { useTheme } from '@mui/material/styles';
 import { 
   Container, Box, Typography, Button, Grid, Paper, 
   CircularProgress, IconButton, Divider, Card, 
-  CardContent, Modal, Fade, Backdrop, Tooltip, Chip 
+  CardContent, Modal, Fade, Backdrop, Tooltip 
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
