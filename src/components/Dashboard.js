@@ -338,11 +338,16 @@ const Dashboard = () => {
                   <Typography
                     sx={{
                       fontWeight: 'bold',
-                      fontSize: { xs: '2.5rem', sm: '3rem' },
+                      fontSize: { xs: '3rem', sm: '3.7rem' },
                       color: getGradeColor(investment.grade),
                       textAlign: 'center',
                       lineHeight: 1,
                       ml: 2,
+                      width: { xs: 90, sm: 110 },
+                      height: { xs: 90, sm: 110 },
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                   >
                     {investment.grade || '-'}
