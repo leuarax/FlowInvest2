@@ -28,8 +28,10 @@ export default async function handler(req, res) {
 - Estimated ROI scenarios (pessimistic, realistic, optimistic, in %)
 - Estimated monthly cashflow (in EUR)
 - Estimated monthly cashflow after mortgage is paid off (in EUR)
-- Take into account inflation, all costs, and financing
-- A detailed analysis text
+- A realistic average estimated ROI (not 0, and not just repeating the input)
+- A recommended 'amount' field for the investment card (use purchase price or market price as appropriate)
+- Take into account inflation, all costs, financing, and market context
+- A detailed, insightful analysis text that explains the reasoning, strengths, weaknesses, and context of the investment. Do NOT just repeat the user input. Explain why the grade and risk score were given, and what the numbers mean for the user.
 
 Property data:
 Country: ${data.country}
@@ -50,7 +52,7 @@ Interest: ${data.interest}
 Repayment Rate (monthly): ${data.repaymentRate}
 Interest Rate Fixation (months): ${data.interestFixation}
 
-Respond in JSON with keys: grade, riskScore, roiScenarios (with pessimistic, realistic, optimistic), cashflow, cashflowAfterMortgage, explanation, riskExplanation.`;
+Respond in JSON with keys: grade, riskScore, roiEstimate, roiScenarios (with pessimistic, realistic, optimistic), cashflow, cashflowAfterMortgage, amount, explanation, riskExplanation.`;
 
   try {
     let text;
