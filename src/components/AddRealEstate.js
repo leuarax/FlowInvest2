@@ -74,6 +74,7 @@ const AddRealEstate = () => {
       name: `${form.objectType || 'Real Estate'} in ${form.city}`,
       type: 'Real Estate',
       ...form,
+      amount: analysis.amount || form.purchasePrice || form.marketPrice || 0,
       grade: analysis.grade,
       riskScore: analysis.riskScore,
       riskExplanation: analysis.riskExplanation,
