@@ -249,6 +249,13 @@ const Dashboard = () => {
             Fast Add Portfolio
           </Button>
         </Tooltip>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={() => navigate('/add-real-estate')}
+        >
+          Add Real Estate
+        </Button>
         <Button 
           variant="outlined" 
           onClick={handleGetPortfolioAnalysis} 
