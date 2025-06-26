@@ -1,9 +1,18 @@
-const { Configuration, OpenAIApi } = require('openai');
+let openai, isV4 = false;
 
-const configuration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-const openai = new OpenAIApi(configuration);
+try {
+  // Try v4+ style
+  const OpenAI = require('openai');
+  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  isV4 = true;
+} catch (e) {
+  // Fallback to v3 style
+  const { Configuration, OpenAIApi } = require('openai');
+  const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+  openai = new OpenAIApi(configuration);
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -44,16 +53,33 @@ Interest Rate Fixation (months): ${data.interestFixation}
 Respond in JSON with keys: grade, riskScore, roiScenarios (with pessimistic, realistic, optimistic), cashflow, cashflowAfterMortgage, explanation, riskExplanation.`;
 
   try {
-    const completion = await openai.createChatCompletion({
-      model: 'gpt-4o',
-      messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.2,
-      max_tokens: 800,
-    });
-    const text = completion.data.choices[0].message.content;
+    let text;
+    if (isV4) {
+      // v4+ syntax
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 800,
+      });
+      text = completion.choices[0].message.content;
+    } else {
+      // v3 syntax
+      const completion = await openai.createChatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 800,
+      });
+      text = completion.data.choices[0].message.content;
+    }
+
     let result;
     try {
       result = JSON.parse(text);
