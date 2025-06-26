@@ -87,13 +87,11 @@ function App() {
         display: 'flex',
         flexDirection: 'column',
       }}>
-        <Router>
-          <Routes>
-            <Route path="/" element={<Onboarding />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/add-investment" element={<InvestmentForm />} />
-          </Routes>
-        </Router>
+        <Routes>
+          <Route path="/" element={<Onboarding />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/add-investment" element={<InvestmentForm />} />
+        </Routes>
       </Box>
     </ThemeProvider>
   );
