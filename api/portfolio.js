@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
       ${investments.map(inv => `- ${inv.name} ($${inv.amount}, Type: ${inv.type})`).join('\n')}
 
       **Your Task:**
-      Provide a single, structured JSON object with the following three keys. Your entire analysis MUST be tailored to the user's profile.
+      Provide a single, structured JSON object with the following keys. Your entire analysis MUST be tailored to the user's profile.
 
       1.  **"grade"**: A single letter grade using a granular scale (e.g., A+, A, A-, B+, B, B-, C+, etc.). **This grade must NOT be based on general market standards.** It must exclusively reflect how well the current portfolio aligns with the user's **Primary Investment Goal** and **Risk Appetite**. A high-risk portfolio might be an 'A+' for a user with a high-risk goal, even if it's not diversified.
 
@@ -41,6 +41,10 @@ module.exports = async (req, res) => {
       3.  **"recommendations"**: An array of exactly 3 new, specific investment recommendations. **These recommendations must be deeply personalized.** For each recommendation, you must:
           - Provide a "name" for the investment.
           - Provide a "reason" (3-5 words) that explicitly connects the recommendation to the user's **Primary Investment Goal** or **Stated Interests**. For example, if their goal is "long-term ethical growth," a recommendation reason could be "Adds sustainable energy exposure."
+
+      4.  **"historicalValues"**: An array of 6 numbers representing the total value of the user's portfolio at each year, from 5 years ago to now (e.g., [value5YearsAgo, ..., valueNow]).
+
+      5.  **"recommendedValues"**: An array of 6 numbers representing the projected value of the user's portfolio if your 3 recommendations had been added proportionally 5 years ago, calculated for each year from 5 years ago to now (e.g., [value5YearsAgo, ..., valueNow]).
 
       The entire response must be a single JSON object. Do not include any text outside of the JSON.
     `;

@@ -7,12 +7,18 @@ const investmentHandler = require('./api/investment.js');
 const portfolioHandler = require('./api/portfolio.js');
 const analyzeScreenshotHandler = require('./api/analyze-screenshot.js');
 const batchScreenshotHandler = require('./api/batch-screenshot.js');
+const analyzeRealEstateHandler = require('./api/analyze-real-estate.js');
 
 const app = express();
 const port = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://flowinvest2.vercel.app' 
+    : 'http://localhost:3000',
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -30,6 +36,11 @@ app.post('/api/analyze-screenshot', (req, res, next) => {
   analyzeScreenshotHandler(req, res).catch(next);
 });
 
+// Real estate analysis endpoint
+app.post('/api/analyze-real-estate', (req, res, next) => {
+  analyzeRealEstateHandler(req, res).catch(next);
+});
+
 // Batch portfolio analysis endpoint
 app.post('/api/analyze-portfolio', (req, res, next) => {
   console.log('Received request to /api/analyze-portfolio');
@@ -37,11 +48,11 @@ app.post('/api/analyze-portfolio', (req, res, next) => {
   // Log request headers for debugging
   console.log('Request headers:', req.headers);
   
-  // Handle file upload with multer
+  // Handle file upload with multer - support multiple files with 'screenshots' field
   const multerUpload = multer({ 
     dest: 'uploads/',
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-  }).single('screenshot');
+  }).array('screenshots', 10); // Allow up to 10 files with field name 'screenshots'
   
   multerUpload(req, res, (err) => {
     if (err) {
@@ -52,12 +63,14 @@ app.post('/api/analyze-portfolio', (req, res, next) => {
       });
     }
     
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ 
-        error: 'No file uploaded',
-        details: 'Please upload a screenshot file with the key "screenshot"' 
+        error: 'No files uploaded',
+        details: 'Please upload screenshot files with the key "screenshots"' 
       });
     }
+    
+    console.log('Files uploaded:', req.files.length);
     
     // Call the batch screenshot handler
     batchScreenshotHandler(req, res).catch(error => {
@@ -69,6 +82,8 @@ app.post('/api/analyze-portfolio', (req, res, next) => {
     });
   });
 });
+
+app.use('/api/stress-test', require('./api/stress-test'));
 
 // Serve static files from the React app
 if (process.env.NODE_ENV === 'production') {

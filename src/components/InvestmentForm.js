@@ -2,19 +2,26 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Container, Box, Typography, TextField, Button, 
-  Grid, Paper, CircularProgress, Alert, LinearProgress
+  Grid, Paper, CircularProgress, Alert, LinearProgress,
+  Chip, Card, CardContent, Fade
 } from '@mui/material';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import SaveIcon from '@mui/icons-material/Save';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import SecurityIcon from '@mui/icons-material/Security';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 // Utility function to determine color based on grade
 const getGradeColor = (grade) => {
-  if (!grade) return 'text.secondary';
+  if (!grade) return '#64748b';
   const upperGrade = grade.toUpperCase();
-  if (upperGrade.startsWith('A')) return 'success.main';
-  if (upperGrade.startsWith('B')) return 'warning.light';
-  if (upperGrade.startsWith('C')) return 'warning.main';
-  if (upperGrade.startsWith('D')) return 'error.light';
-  if (upperGrade.startsWith('F')) return 'error.main';
-  return 'text.primary';
+  if (upperGrade.startsWith('A')) return '#10b981';
+  if (upperGrade.startsWith('B')) return '#f59e0b';
+  if (upperGrade.startsWith('C')) return '#f97316';
+  if (upperGrade.startsWith('D')) return '#ef4444';
+  if (upperGrade.startsWith('F')) return '#dc2626';
+  return '#64748b';
 };
 
 const InvestmentForm = () => {
@@ -62,10 +69,19 @@ const InvestmentForm = () => {
     apiFormData.append('screenshot', file);
 
     try {
-      const res = await fetch('/api/analyze-screenshot', {
-        method: 'POST',
-        body: apiFormData,
-      });
+      let res;
+      try {
+        res = await fetch('http://localhost:3001/api/analyze-screenshot', {
+          method: 'POST',
+          body: apiFormData,
+        });
+      } catch (err) {
+        console.log('Local server failed, trying production URL...', err);
+        res = await fetch('https://flowinvest2.vercel.app/api/analyze-screenshot', {
+          method: 'POST',
+          body: apiFormData,
+        });
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: 'Server error' }));
@@ -116,190 +132,551 @@ const InvestmentForm = () => {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Grid container spacing={4}>
-        {/* Left Side: Input Form */}
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 3, mb: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Thinking About a New Investment?
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <Typography variant="body1" gutterBottom>
-                  Upload a screenshot of your potential investment here:
+    <Box sx={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      py: 4
+    }}>
+      <Container maxWidth="lg">
+        {/* Header Section */}
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <Typography 
+            variant="h3" 
+            sx={{ 
+              color: 'white', 
+              fontWeight: 700, 
+              mb: 2,
+              textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+            }}
+          >
+            FlowInvest
+          </Typography>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              color: 'rgba(255,255,255,0.9)', 
+              fontWeight: 400,
+              mb: 1
+            }}
+          >
+            Thinking About a New Investment?
+          </Typography>
+          <Typography 
+            variant="body1" 
+            sx={{ 
+              color: 'rgba(255,255,255,0.8)',
+              maxWidth: '600px',
+              mx: 'auto'
+            }}
+          >
+            Upload a screenshot of your potential investment and let our AI analyze it for you
+          </Typography>
+        </Box>
+
+        <Grid container spacing={4}>
+          {/* Left Side: Input Form */}
+          <Grid item xs={12} md={5}>
+            <Paper sx={{ 
+              background: 'rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '24px',
+              p: 4,
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+            }}>
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h5" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                  Upload Investment Screenshot
                 </Typography>
-                <input
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  id="screenshot-upload"
-                  type="file"
-                  onChange={handleFileChange}
-                />
-                <label htmlFor="screenshot-upload">
-                  <Button
-                    variant="contained"
-                    component="span"
-                    fullWidth
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CircularProgress size={20} />
-                        <span>Uploading...</span>
-                      </Box>
-                    ) : (
-                      'Upload Screenshot'
-                    )}
-                  </Button>
-                </label>
-                {/* Privacy Note */}
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  Your screenshots are never stored anywhere.
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Share a screenshot of your potential investment for AI analysis
                 </Typography>
-              </Grid>
-              {filePreview && (
+              </Box>
+
+              <Grid container spacing={3}>
+                {/* Upload Section */}
                 <Grid item xs={12}>
                   <Box sx={{
-                    width: '100%',
-                    height: 300,
-                    borderRadius: 2,
-                    overflow: 'hidden',
-                    bgcolor: 'grey.200',
-                    position: 'relative',
+                    border: '2px dashed rgba(102, 126, 234, 0.3)',
+                    borderRadius: '16px',
+                    p: 4,
+                    textAlign: 'center',
+                    background: filePreview ? 'transparent' : 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      borderColor: 'rgba(102, 126, 234, 0.5)',
+                      background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                    }
                   }}>
-                    <img
-                      src={filePreview}
-                      alt="Uploaded screenshot"
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                      }}
+                    <input
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      id="screenshot-upload"
+                      type="file"
+                      onChange={handleFileChange}
                     />
+                    <label htmlFor="screenshot-upload">
+                      <Button
+                        variant="contained"
+                        component="span"
+                        startIcon={<CloudUploadIcon />}
+                        disabled={loading}
+                        sx={{
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          borderRadius: '12px',
+                          py: 1.5,
+                          px: 4,
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          fontSize: '1rem',
+                          '&:hover': {
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                          },
+                          transition: 'all 0.3s ease'
+                        }}
+                      >
+                        {loading ? 'Uploading...' : 'Upload Screenshot'}
+                      </Button>
+                    </label>
+                    
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        mt: 2,
+                        color: '#10b981',
+                        fontWeight: 600,
+                        background: 'rgba(16, 185, 129, 0.1)',
+                        borderRadius: '8px',
+                        py: 1,
+                        px: 2,
+                        display: 'inline-block'
+                      }}
+                    >
+                      🔒 Your screenshots are never stored anywhere
+                    </Typography>
                   </Box>
                 </Grid>
-              )}
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label="Additional Notes"
-                  variant="outlined"
-                  value={additionalNotes}
-                  onChange={(e) => setAdditionalNotes(e.target.value)}
-                  disabled={loading}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Button
-                  variant="contained"
-                  fullWidth
-                  onClick={handleAnalyze}
-                  disabled={loading || !file}
-                >
-                  {loading ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CircularProgress size={20} />
-                      <span>Analysing Portfolio {analysisProgress}%</span>
-                    </Box>
-                  ) : (
-                    'Analyze Portfolio'
-                  )}
-                </Button>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
 
-        {/* Right Side: AI Analysis Display */}
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold' }}>
-              AI Analysis
-            </Typography>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-                <CircularProgress />
-              </Box>
-            ) : error ? (
-              <Alert severity="error">{error}</Alert>
-            ) : analysis ? (
-              <Box>
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                  <Grid item xs={12} sm={4}>
-                    <Paper elevation={2} sx={{ p: 2, textAlign: 'center', height: '100%' }}>
-                      <Typography variant="h2" sx={{ color: getGradeColor(analysis.grade), fontWeight: 'bold' }}>
-                        {analysis.grade || '-'}
-                      </Typography>
-                      <Typography variant="subtitle1" color="text.secondary">Overall Grade</Typography>
-                    </Paper>
-                  </Grid>
-                  <Grid item xs={12} sm={8}>
-                    <Paper elevation={2} sx={{ p: 2, height: '100%' }}>
-                      <Typography variant="h6">Risk Analysis</Typography>
-                      <Typography variant="body1">Score: {analysis.riskScore || 'N/A'}/10</Typography>
-                      <LinearProgress variant="determinate" value={(analysis.riskScore || 0) * 10} sx={{ height: 10, borderRadius: 5, my: 1 }} />
-                      {analysis.riskExplanation && <Typography variant="body2" color="text.secondary">{analysis.riskExplanation}</Typography>}
-                    </Paper>
-                  </Grid>
+                {/* Preview Section */}
+                {filePreview && (
                   <Grid item xs={12}>
-                    <Paper elevation={2} sx={{ p: 2 }}>
-                      <Typography variant="h6">ROI Scenarios</Typography>
-                      {analysis.roiScenarios ? (
-                        <Box sx={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center', mt: 1 }}>
-                          <Box>
-                            <Typography variant="h6">{analysis.roiScenarios.pessimistic}%</Typography>
-                            <Typography variant="caption">Pessimistic</Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="h5" color="primary">{analysis.roiScenarios.realistic}%</Typography>
-                            <Typography variant="caption">Realistic (Avg.)</Typography>
-                          </Box>
-                          <Box>
-                            <Typography variant="h6">{analysis.roiScenarios.optimistic}%</Typography>
-                            <Typography variant="caption">Optimistic</Typography>
-                          </Box>
+                    <Fade in={!!filePreview}>
+                      <Card sx={{
+                        borderRadius: '16px',
+                        overflow: 'hidden',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                      }}>
+                        <Box sx={{
+                          position: 'relative',
+                          height: 300,
+                          background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)'
+                        }}>
+                          <img
+                            src={filePreview}
+                            alt="Uploaded screenshot"
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              borderRadius: '16px'
+                            }}
+                          />
+                          <Chip
+                            label="Preview"
+                            size="small"
+                            sx={{
+                              position: 'absolute',
+                              top: 12,
+                              right: 12,
+                              background: 'rgba(255,255,255,0.9)',
+                              fontWeight: 600
+                            }}
+                          />
                         </Box>
-                      ) : <Typography>Not available.</Typography>}
-                    </Paper>
+                      </Card>
+                    </Fade>
                   </Grid>
+                )}
+
+                {/* Notes Section */}
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Additional Notes"
+                    variant="outlined"
+                    value={additionalNotes}
+                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                    disabled={loading}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        background: 'rgba(248, 250, 252, 0.8)',
+                        '&:hover fieldset': {
+                          borderColor: '#667eea'
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#667eea'
+                        }
+                      }
+                    }}
+                  />
                 </Grid>
 
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                    Full Analysis
-                  </Typography>
-                  {analysis.explanation ? (
-                    <Typography variant="body2" sx={{ lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '200px', overflowY: 'auto', p:1, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                      {analysis.explanation}
-                    </Typography>
-                  ) : <Typography>Not available.</Typography>}
-                </Box>
-                
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={handleSaveInvestment}
-                  sx={{ mt: 3, py: 1.5, fontWeight: 'bold' }}
-                  fullWidth
-                >
-                  Save Investment to Portfolio
-                </Button>
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px', color: 'text.secondary' }}>
-                <Typography variant="body1">
-                  Upload a screenshot of an investment to begin analysis.
+                {/* Analyze Button */}
+                <Grid item xs={12}>
+                  <Button
+                    variant="contained"
+                    fullWidth
+                    onClick={handleAnalyze}
+                    disabled={loading || !file}
+                    startIcon={loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <AnalyticsIcon />}
+                    sx={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: '16px',
+                      py: 2,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      fontSize: '1.1rem',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 12px 30px rgba(102, 126, 234, 0.4)'
+                      },
+                      '&:disabled': {
+                        background: 'rgba(100, 116, 139, 0.3)',
+                        color: 'rgba(255,255,255,0.7)'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    {loading ? `Analyzing... ${Math.round(analysisProgress)}%` : 'Analyze Portfolio'}
+                  </Button>
+                  
+                  {loading && (
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={analysisProgress}
+                      sx={{ 
+                        mt: 2,
+                        borderRadius: '4px',
+                        height: '8px',
+                        '& .MuiLinearProgress-bar': {
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+                        }
+                      }} 
+                    />
+                  )}
+                </Grid>
+              </Grid>
+            </Paper>
+          </Grid>
+
+          {/* Right Side: AI Analysis Display */}
+          <Grid item xs={12} md={7}>
+            <Paper sx={{ 
+              background: 'rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: '24px',
+              p: 4,
+              minHeight: '600px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+            }}>
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="h5" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                  AI Analysis Results
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  Comprehensive investment analysis powered by artificial intelligence
                 </Typography>
               </Box>
-            )}
-          </Paper>
+
+              {loading ? (
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  minHeight: '400px',
+                  background: 'rgba(102, 126, 234, 0.05)',
+                  borderRadius: '16px'
+                }}>
+                  <CircularProgress 
+                    size={60}
+                    thickness={4}
+                    sx={{ color: '#667eea', mb: 3 }}
+                  />
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                    Analyzing Investment...
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+                    Our AI is processing your screenshot
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#667eea', fontWeight: 600 }}>
+                    {Math.round(analysisProgress)}% Complete
+                  </Typography>
+                </Box>
+              ) : error ? (
+                <Alert 
+                  severity="error"
+                  sx={{
+                    borderRadius: '12px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    '& .MuiAlert-icon': {
+                      color: '#dc2626'
+                    }
+                  }}
+                >
+                  {error}
+                </Alert>
+              ) : analysis ? (
+                <Fade in={!!analysis}>
+                  <Box>
+                    {/* Analysis Cards */}
+                    <Grid container spacing={3} sx={{ mb: 4 }}>
+                      {/* Grade Card */}
+                      <Grid item xs={12} sm={4}>
+                        <Card sx={{
+                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
+                          border: '1px solid rgba(16, 185, 129, 0.2)',
+                          borderRadius: '16px',
+                          textAlign: 'center',
+                          p: 2,
+                          height: '100%',
+                          transition: 'transform 0.2s ease',
+                          '&:hover': {
+                            transform: 'translateY(-4px)'
+                          }
+                        }}>
+                          <CardContent>
+                            <AssessmentIcon sx={{ fontSize: 40, color: getGradeColor(analysis.grade), mb: 1 }} />
+                            <Typography 
+                              variant="h2" 
+                              sx={{ 
+                                color: getGradeColor(analysis.grade), 
+                                fontWeight: 700,
+                                mb: 1
+                              }}
+                            >
+                              {analysis.grade || '-'}
+                            </Typography>
+                            <Typography variant="subtitle1" sx={{ color: '#64748b', fontWeight: 600 }}>
+                              Overall Grade
+                            </Typography>
+                          </CardContent>
+                        </Card>
+                      </Grid>
+
+                      {/* Risk Analysis Card */}
+                      <Grid item xs={12} sm={8}>
+                        <Card sx={{
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          borderRadius: '16px',
+                          p: 2,
+                          height: '100%',
+                          transition: 'transform 0.2s ease',
+                          '&:hover': {
+                            transform: 'translateY(-4px)'
+                          }
+                        }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                              <SecurityIcon sx={{ fontSize: 32, color: '#3b82f6', mr: 1 }} />
+                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                                Risk Analysis
+                              </Typography>
+                            </Box>
+                            <Typography variant="h4" sx={{ fontWeight: 700, color: '#3b82f6', mb: 1 }}>
+                              {analysis.riskScore || 'N/A'}/10
+                            </Typography>
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={(analysis.riskScore || 0) * 10} 
+                              sx={{ 
+                                height: 12, 
+                                borderRadius: 6, 
+                                mb: 2,
+                                '& .MuiLinearProgress-bar': {
+                                  background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
+                                }
+                              }} 
+                            />
+                            {analysis.riskExplanation && (
+                              <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.5 }}>
+                                {analysis.riskExplanation}
+                              </Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+
+                      {/* ROI Scenarios Card */}
+                      <Grid item xs={12}>
+                        <Card sx={{
+                          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
+                          border: '1px solid rgba(168, 85, 247, 0.2)',
+                          borderRadius: '16px',
+                          p: 2,
+                          transition: 'transform 0.2s ease',
+                          '&:hover': {
+                            transform: 'translateY(-4px)'
+                          }
+                        }}>
+                          <CardContent>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+                              <TrendingUpIcon sx={{ fontSize: 32, color: '#a855f7', mr: 1 }} />
+                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                                ROI Scenarios
+                              </Typography>
+                            </Box>
+                            {analysis.roiScenarios ? (
+                              <Grid container spacing={3}>
+                                <Grid item xs={12} sm={4}>
+                                  <Box sx={{ textAlign: 'center' }}>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#ef4444', mb: 1 }}>
+                                      {analysis.roiScenarios.pessimistic}%
+                                    </Typography>
+                                    <Chip 
+                                      label="Pessimistic" 
+                                      size="small"
+                                      sx={{ 
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        color: '#ef4444',
+                                        fontWeight: 600
+                                      }}
+                                    />
+                                  </Box>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                  <Box sx={{ textAlign: 'center' }}>
+                                    <Typography variant="h3" sx={{ fontWeight: 700, color: '#a855f7', mb: 1 }}>
+                                      {analysis.roiScenarios.realistic}%
+                                    </Typography>
+                                    <Chip 
+                                      label="Realistic (Avg.)" 
+                                      size="small"
+                                      sx={{ 
+                                        background: 'rgba(168, 85, 247, 0.2)',
+                                        color: '#a855f7',
+                                        fontWeight: 600
+                                      }}
+                                    />
+                                  </Box>
+                                </Grid>
+                                <Grid item xs={12} sm={4}>
+                                  <Box sx={{ textAlign: 'center' }}>
+                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#10b981', mb: 1 }}>
+                                      {analysis.roiScenarios.optimistic}%
+                                    </Typography>
+                                    <Chip 
+                                      label="Optimistic" 
+                                      size="small"
+                                      sx={{ 
+                                        background: 'rgba(16, 185, 129, 0.1)',
+                                        color: '#10b981',
+                                        fontWeight: 600
+                                      }}
+                                    />
+                                  </Box>
+                                </Grid>
+                              </Grid>
+                            ) : (
+                              <Typography sx={{ color: '#64748b' }}>Not available.</Typography>
+                            )}
+                          </CardContent>
+                        </Card>
+                      </Grid>
+                    </Grid>
+
+                    {/* Full Analysis */}
+                    <Card sx={{
+                      borderRadius: '16px',
+                      border: '1px solid rgba(226, 232, 240, 0.8)',
+                      mb: 3
+                    }}>
+                      <CardContent>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
+                          Detailed Analysis
+                        </Typography>
+                        {analysis.explanation ? (
+                          <Box sx={{
+                            background: 'rgba(248, 250, 252, 0.8)',
+                            borderRadius: '12px',
+                            p: 3,
+                            border: '1px solid rgba(226, 232, 240, 0.8)'
+                          }}>
+                            <Typography 
+                              variant="body1" 
+                              sx={{ 
+                                lineHeight: 1.7, 
+                                whiteSpace: 'pre-wrap',
+                                color: '#374151'
+                              }}
+                            >
+                              {analysis.explanation}
+                            </Typography>
+                          </Box>
+                        ) : (
+                          <Typography sx={{ color: '#64748b' }}>Not available.</Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                    
+                    {/* Save Button */}
+                    <Button
+                      variant="contained"
+                      onClick={handleSaveInvestment}
+                      startIcon={<SaveIcon />}
+                      fullWidth
+                      sx={{
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        borderRadius: '16px',
+                        py: 2,
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        fontSize: '1.1rem',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 12px 30px rgba(16, 185, 129, 0.4)'
+                        },
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Save Investment to Portfolio
+                    </Button>
+                  </Box>
+                </Fade>
+              ) : (
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  minHeight: '400px',
+                  background: 'rgba(248, 250, 252, 0.8)',
+                  borderRadius: '16px',
+                  border: '2px dashed rgba(226, 232, 240, 0.8)'
+                }}>
+                  <AnalyticsIcon sx={{ fontSize: 80, color: '#cbd5e1', mb: 2 }} />
+                  <Typography variant="h6" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
+                    Ready for Analysis
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#94a3b8', textAlign: 'center' }}>
+                    Upload a screenshot of an investment to begin AI analysis
+                  </Typography>
+                </Box>
+              )}
+            </Paper>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
+    </Box>
   );
 };
 
 export default InvestmentForm;
+

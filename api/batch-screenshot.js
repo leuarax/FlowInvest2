@@ -1,13 +1,6 @@
-const multer = require('multer');
 const fs = require('fs').promises;
 const path = require('path');
 const OpenAI = require('openai');
-
-// Configure multer for file uploads
-const upload = multer({ 
-  dest: 'uploads/',
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-}).single('screenshot');
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -16,38 +9,31 @@ const openai = new OpenAI({
 });
 
 module.exports = async (req, res) => {
-  console.log('Received request to analyze portfolio screenshot');
+  console.log('Received request to analyze portfolio screenshots');
   
-  // Handle file upload
-  upload(req, res, async (err) => {
-    if (err) {
-      console.error('Upload error:', err);
-      return res.status(400).json({ error: 'File upload failed', details: err.message });
-    }
-
-    console.log('Uploaded file info:', {
-      file: req.file ? {
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size
-      } : 'No file uploaded'
+  // Files are already uploaded by multer in server.js
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ 
+      error: 'No files uploaded',
+      details: 'Please ensure you are sending files with the key "screenshots"'
     });
+  }
 
-    if (!req.file) {
-      return res.status(400).json({ 
-        error: 'No file uploaded',
-        details: 'Please ensure you are sending a file with the key "screenshot"'
-      });
-    }
-
-    try {
+  try {
+    // Process all uploaded files
+    const allInvestments = [];
+    
+    for (const file of req.files) {
+      console.log('Processing file:', file.originalname);
+      
       // Read the uploaded file
-      console.log('Reading uploaded file from:', req.file.path);
-      const imageBuffer = await fs.readFile(req.file.path);
+      console.log('Reading uploaded file from:', file.path);
+      const imageBuffer = await fs.readFile(file.path);
       const base64Image = imageBuffer.toString('base64');
       
       if (!base64Image || base64Image.length < 100) {
-        throw new Error('Invalid image data');
+        console.warn('Invalid image data for file:', file.originalname);
+        continue;
       }
       
       console.log('Image read successfully, size:', base64Image.length, 'chars');
@@ -87,10 +73,10 @@ Return a JSON array of investment objects. Only include data that is clearly vis
         max_tokens: 3000,
         });
 
-      console.log('Received batch analysis from OpenAI');
+      console.log('Received batch analysis from OpenAI for file:', file.originalname);
 
         // Clean up the uploaded file
-        await fs.unlink(req.file.path).catch(e => console.error('Error deleting temp file:', e));
+        await fs.unlink(file.path).catch(e => console.error('Error deleting temp file:', e));
 
         // Parse the AI response
         console.log('Received response from OpenAI');
@@ -118,7 +104,7 @@ Return a JSON array of investment objects. Only include data that is clearly vis
         console.log('Successfully parsed JSON:', JSON.stringify(parsedData, null, 2));
       } catch (e) {
         console.error('Error parsing JSON:', e);
-        throw new Error(`Failed to parse AI response: ${e.message}`);
+        continue; // Skip this file if JSON parsing fails
       }
         
       // Ensure we have an array of investments
@@ -149,55 +135,54 @@ Return a JSON array of investment objects. Only include data that is clearly vis
         return isValid;
       });
       
-      console.log('Final cleaned investments:', cleanedInvestments);
+      // Add to all investments
+      allInvestments.push(...cleanedInvestments);
       
-      if (cleanedInvestments.length === 0) {
-        throw new Error('No valid investments found in the image');
+      } catch (fileError) {
+        console.error('Error processing file:', file.originalname, fileError);
+        // Continue with other files
       }
-      
-      // Return the investments as an array directly
-      return res.json(cleanedInvestments);
-    } catch (parseError) {
-      console.error('Error parsing investments:', parseError);
-      console.error('Problematic content:', content);
-      return res.status(500).json({ 
-        error: 'Failed to parse investments',
-        details: parseError.message,
-        content: content
-      });
     }
-      
-    } catch (error) {
-      console.error('Error in batch analysis:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        code: error.code,
-        type: error.type,
-        response: error.response?.data
-      });
-      
-      let errorMessage = 'Failed to analyze portfolio';
-      let details = error.message;
-      
-      // Handle specific OpenAI API errors
-      if (error.code === 'model_not_found') {
-        errorMessage = 'Model not found';
-        details = 'The requested AI model is not available. Please check your OpenAI API access.';
-      } else if (error.code === 'invalid_api_key') {
-        errorMessage = 'Invalid API Key';
-        details = 'The provided OpenAI API key is invalid. Please check your configuration.';
-      } else if (error.response?.status === 429) {
-        errorMessage = 'Rate Limit Exceeded';
-        details = 'You have exceeded your API rate limit. Please try again later.';
-      }
-      
-      return res.status(500).json({ 
-        error: errorMessage,
-        details: details,
-        code: error.code,
-        type: error.type
-      });
+    
+    console.log('Final all investments:', allInvestments);
+    
+    if (allInvestments.length === 0) {
+      throw new Error('No valid investments found in any of the uploaded images');
     }
-  });
+    
+    // Return the investments wrapped in a data property to match expected format
+    return res.json({ data: allInvestments });
+    
+  } catch (error) {
+    console.error('Error in batch analysis:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      type: error.type,
+      response: error.response?.data
+    });
+    
+    let errorMessage = 'Failed to analyze portfolio';
+    let details = error.message;
+    
+    // Handle specific OpenAI API errors
+    if (error.code === 'model_not_found') {
+      errorMessage = 'Model not found';
+      details = 'The requested AI model is not available. Please check your OpenAI API access.';
+    } else if (error.code === 'invalid_api_key') {
+      errorMessage = 'Invalid API Key';
+      details = 'The provided OpenAI API key is invalid. Please check your configuration.';
+    } else if (error.response?.status === 429) {
+      errorMessage = 'Rate Limit Exceeded';
+      details = 'You have exceeded your API rate limit. Please try again later.';
+    }
+    
+    return res.status(500).json({ 
+      error: errorMessage,
+      details: details,
+      code: error.code,
+      type: error.type
+    });
+  }
 };

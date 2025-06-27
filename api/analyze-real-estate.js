@@ -14,7 +14,7 @@ try {
   openai = new OpenAIApi(configuration);
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -98,4 +98,6 @@ Respond in JSON with keys: grade, riskScore, roiEstimate, roiScenarios (with pes
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to analyze real estate investment.' });
   }
-} 
+}
+
+module.exports = handler; 
