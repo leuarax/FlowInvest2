@@ -282,23 +282,35 @@ const Dashboard = () => {
     try {
       const userProfile = JSON.parse(localStorage.getItem('userProfile'));
       let res, data;
+      
+      // Try local endpoint first
       try {
+        console.log('Trying local endpoint...');
         res = await fetch('http://localhost:3001/api/stress-test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scenario: stressTestInput, investments, userProfile })
         });
         data = await res.json();
+        console.log('Local response status:', res.status);
+        console.log('Local response data:', data);
       } catch (err) {
+        console.log('Local endpoint failed:', err.message);
+        
+        // Try Vercel endpoint
         try {
+          console.log('Trying Vercel endpoint...');
           res = await fetch('https://flowinvest2.vercel.app/api/stress-test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ scenario: stressTestInput, investments, userProfile })
           });
           data = await res.json();
+          console.log('Vercel response status:', res.status);
+          console.log('Vercel response data:', data);
         } catch (err2) {
-          data = { error: 'Both local and Vercel endpoints failed.' };
+          console.log('Vercel endpoint failed:', err2.message);
+          data = { error: `Both endpoints failed. Local: ${err.message}, Vercel: ${err2.message}` };
         }
       }
       
@@ -334,6 +346,7 @@ const Dashboard = () => {
         setStressTestAnalysis(null);
       }
     } catch (e) {
+      console.error('Unexpected error in stress test:', e);
       setStressTestError('Error contacting AI.');
       setStressTestAnalysis(null);
     } finally {

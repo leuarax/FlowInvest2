@@ -1,76 +1,91 @@
-let openai, isV4 = false;
-try {
-  // Try OpenAI v4+ style
-  const OpenAI = require('openai');
-  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  isV4 = true;
-} catch (e) {
-  // Fallback to v3 style
-  const { Configuration, OpenAIApi } = require('openai');
-  openai = new OpenAIApi(new Configuration({ apiKey: process.env.OPENAI_API_KEY }));
+const OpenAI = require('openai');
+
+const apiKey = process.env.OPENAI_API_KEY;
+
+if (!apiKey) {
+  console.error('OPENAI_API_KEY is not set in environment variables.');
 }
 
+const openai = new OpenAI({
+  apiKey: apiKey,
+  baseURL: 'https://api.openai.com/v1'
+});
+
 module.exports = async (req, res) => {
-  console.log('POST /api/stress-test called');
+  // Enable CORS for Vercel
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
     const { scenario, investments, userProfile } = req.body;
-    if (!scenario || !investments) {
-      return res.status(400).json({ error: 'Missing scenario or investments.' });
+
+    if (!scenario || !investments || !userProfile) {
+      return res.status(400).json({ error: 'Missing required fields: scenario, investments, or userProfile' });
     }
 
-    // Step 1: Quick validation check
-    const validationPrompt = `Is this a valid market scenario for portfolio stress testing? Answer with ONLY "yes" or "no".
+    console.log('POST /api/stress-test called');
+    console.log('Scenario:', scenario);
+    console.log('Investments count:', investments.length);
+    console.log('User profile:', userProfile);
 
-Input: "${scenario}"
+    // Step 1: Quick validation
+    const validationPrompt = `Is this a valid financial/market scenario for portfolio stress testing? Answer only "yes" or "no".
 
-Examples of valid scenarios: "interest rates rise", "stock market crash", "inflation increases", "tech sector correction"
-Examples of invalid inputs: "i love bikes", "hello", "i just woke up", "how are you", "i like milfs"
+Scenario: ${scenario}
+
+Valid scenarios include: market crashes, interest rate changes, inflation, geopolitical events, sector-specific events, economic recessions, currency fluctuations, commodity price changes, regulatory changes, etc.
+
+Invalid scenarios include: personal opinions, non-financial topics, inappropriate content, etc.
 
 Answer:`;
 
-    console.log('Validating scenario:', scenario);
-    let isValidScenario;
-    try {
-      if (isV4) {
-        const validationResponse = await openai.chat.completions.create({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: 'You are a validation assistant. Answer with ONLY "yes" or "no".' },
-            { role: 'user', content: validationPrompt }
-          ],
-          temperature: 0.1,
-          max_tokens: 10
-        });
-        const validationAnswer = validationResponse.choices[0].message.content.trim().toLowerCase();
-        console.log('Validation response:', validationAnswer);
-        isValidScenario = validationAnswer === 'yes';
-      } else {
-        const validationResponse = await openai.createChatCompletion({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: 'You are a validation assistant. Answer with ONLY "yes" or "no".' },
-            { role: 'user', content: validationPrompt }
-          ],
-          temperature: 0.1,
-          max_tokens: 10
-        });
-        const validationAnswer = validationResponse.data.choices[0].message.content.trim().toLowerCase();
-        console.log('Validation response:', validationAnswer);
-        isValidScenario = validationAnswer === 'yes';
-      }
-    } catch (err) {
-      console.error('Validation check failed:', err);
-      isValidScenario = false; // Default to invalid if validation fails
+    let validationResponse;
+    const isV4 = typeof openai.chat?.completions?.create === 'function';
+    
+    if (isV4) {
+      const validationCompletion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a financial analyst that validates scenarios for stress testing.' },
+          { role: 'user', content: validationPrompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      });
+      validationResponse = validationCompletion.choices[0].message.content.toLowerCase().trim();
+    } else {
+      const validationCompletion = await openai.createChatCompletion({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: 'You are a financial analyst that validates scenarios for stress testing.' },
+          { role: 'user', content: validationPrompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      });
+      validationResponse = validationCompletion.data.choices[0].message.content.toLowerCase().trim();
     }
 
+    console.log('Validating scenario:', scenario);
+    console.log('Validation response:', validationResponse);
+    
+    const isValidScenario = validationResponse.includes('yes');
     console.log('Is valid scenario?', isValidScenario);
 
-    // If not a valid scenario, return hardcoded message immediately
     if (!isValidScenario) {
       console.log('Returning rejection message for invalid scenario');
-      return res.status(200).json({ 
-        analysis: 'Please enter a different scenario.' 
-      });
+      return res.status(200).json({ analysis: 'Please enter a different scenario.' });
     }
 
     console.log('Proceeding with full analysis for valid scenario');
@@ -178,9 +193,12 @@ The entire response must be a single JSON object. Do not include any text outsid
       return res.status(200).json({ analysis: responseText });
     }
     res.status(200).json(result);
-  } catch (err) {
-    console.error('Error in /api/stress-test:', err.message);
-    console.error(err.stack);
-    res.status(500).json({ error: err.message || 'Failed to analyze scenario.' });
+
+  } catch (error) {
+    console.error('Error in stress test:', error);
+    return res.status(500).json({ 
+      error: 'Failed to analyze stress test',
+      details: error.message,
+    });
   }
 }; 
