@@ -297,10 +297,14 @@ const Dashboard = () => {
       } catch (err) {
         console.log('Local endpoint failed:', err.message);
         
-        // Try Vercel endpoint
+        // Try Vercel endpoint using the same domain as the current page
         try {
           console.log('Trying Vercel endpoint...');
-          res = await fetch('https://flowinvest2.vercel.app/api/stress-test', {
+          const currentOrigin = window.location.origin;
+          const vercelEndpoint = `${currentOrigin}/api/stress-test`;
+          console.log('Using endpoint:', vercelEndpoint);
+          
+          res = await fetch(vercelEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ scenario: stressTestInput, investments, userProfile })
