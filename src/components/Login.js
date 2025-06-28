@@ -29,6 +29,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
 
+  console.log('Login rendered');
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({

@@ -47,6 +47,7 @@ const ProtectedRoute = ({ children }) => {
 // Public Route Component (redirects to dashboard if already authenticated)
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  console.log('PublicRoute', { loading, user });
   
   if (loading) {
     return (
@@ -174,6 +175,7 @@ function AppRoutes() {
 }
 
 function App() {
+  console.log('App rendered');
   return (
     <AuthProvider>
       <ThemeProvider theme={theme}>
