@@ -78,7 +78,7 @@ const InvestmentForm = () => {
         });
       } catch (err) {
         console.log('Local server failed, trying production URL...', err);
-        res = await fetch('https://flowinvest2.vercel.app/api/analyze-screenshot', {
+        res = await fetch('/api/analyze-screenshot', {
           method: 'POST',
           body: apiFormData,
         });

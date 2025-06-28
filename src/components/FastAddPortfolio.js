@@ -99,7 +99,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         data = await makeRequest('http://localhost:3001/api/analyze-portfolio');
       } catch (err) {
         console.log('Local server failed, trying production URL...', err);
-        data = await makeRequest('https://flowinvest2.vercel.app/api/analyze-portfolio');
+        data = await makeRequest('/api/analyze-portfolio');
       }
 
       if (!data || !Array.isArray(data.data)) {

@@ -70,7 +70,7 @@ const AddRealEstate = () => {
         });
       } catch (err) {
         console.log('Local server failed, trying production URL...', err);
-        res = await fetch('https://flowinvest2.vercel.app/api/analyze-real-estate', {
+        res = await fetch('/api/analyze-real-estate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(form),
