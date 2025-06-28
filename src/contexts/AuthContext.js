@@ -38,11 +38,15 @@ export const AuthProvider = ({ children }) => {
       console.log('Auth state changed:', event, session?.user);
       setUser(session?.user ?? null);
       
-      if (session?.user) {
-        const { data: profile } = await db.getUserProfile(session.user.id);
-        setUserProfile(profile);
-      } else {
-        setUserProfile(null);
+      try {
+        if (session?.user) {
+          const { data: profile } = await db.getUserProfile(session.user.id);
+          setUserProfile(profile);
+        } else {
+          setUserProfile(null);
+        }
+      } catch (err) {
+        console.error('Error in onAuthStateChange:', err);
       }
       
       setLoading(false);
