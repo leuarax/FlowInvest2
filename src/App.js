@@ -138,7 +138,10 @@ const theme = createTheme({
   },
 });
 
+console.log('App.js loaded');
+
 function AppRoutes() {
+  console.log('AppRoutes rendered');
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
