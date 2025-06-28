@@ -17,9 +17,11 @@ import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Registration = () => {
-  const { signUp, saveUserProfile, signOut } = useAuth();
+  const { signUp } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -97,21 +99,12 @@ const Registration = () => {
     setAuthError('');
     
     try {
-      // Sign out any existing user before registering a new one
-      await signOut();
-
-      // Sign up the user
-      const { error } = await signUp(formData.email, formData.password);
-      
+      const { error } = await signUp(formData.email, formData.password, onboardingData);
       if (error) {
         setAuthError(error.message);
       } else {
-        // If onboarding data exists, save it to the user profile
-        if (onboardingData) {
-          await saveUserProfile(onboardingData);
-          localStorage.removeItem('userProfile'); // Clean up localStorage
-        }
-        // The authentication guard will handle the redirect to dashboard
+        localStorage.removeItem('userProfile');
+        navigate('/dashboard');
       }
     } catch (error) {
       setAuthError('An unexpected error occurred. Please try again.');
@@ -200,7 +193,7 @@ const Registration = () => {
                   borderRadius: '12px',
                   background: 'rgba(239, 68, 68, 0.1)',
                   border: '1px solid rgba(239, 68, 68, 0.2)',
-                  color: '#991b1b'
+                  color: '#b91c1c'
                 }}
               >
                 {authError}
@@ -260,13 +253,14 @@ const Registration = () => {
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowPassword((show) => !show)}
                         edge="end"
                       >
                         {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
                     </InputAdornment>
-                  ),
+                  )
                 }}
                 sx={{
                   mb: 3,
@@ -302,13 +296,14 @@ const Registration = () => {
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        aria-label="toggle confirm password visibility"
+                        onClick={() => setShowConfirmPassword((show) => !show)}
                         edge="end"
                       >
                         {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
                     </InputAdornment>
-                  ),
+                  )
                 }}
                 sx={{
                   mb: 3,
@@ -327,26 +322,23 @@ const Registration = () => {
 
               <Button
                 type="submit"
-                fullWidth
                 variant="contained"
+                color="primary"
+                fullWidth
                 disabled={loading}
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   borderRadius: '12px',
                   py: 1.5,
+                  fontWeight: 700,
                   fontSize: '1.1rem',
-                  fontWeight: 600,
                   textTransform: 'none',
-                  boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)',
+                  boxShadow: '0 4px 20px rgba(102, 126, 234, 0.15)',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 12px 35px rgba(102, 126, 234, 0.4)'
+                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                    transform: 'translateY(-2px)'
                   },
-                  '&:disabled': {
-                    background: '#e2e8f0',
-                    color: '#94a3b8'
-                  }
+                  transition: 'all 0.3s ease'
                 }}
               >
                 {loading ? 'Creating Account...' : 'Create Account'}

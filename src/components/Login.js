@@ -17,9 +17,11 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const { signIn } = useAuth();
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -81,11 +83,11 @@ const Login = () => {
     
     try {
       const { error } = await signIn(formData.email, formData.password);
-      
       if (error) {
         setAuthError(error.message);
+      } else {
+        navigate('/dashboard');
       }
-      // The authentication guard will handle the redirect to dashboard
     } catch (error) {
       setAuthError('An unexpected error occurred. Please try again.');
     } finally {

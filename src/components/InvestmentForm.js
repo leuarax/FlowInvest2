@@ -12,6 +12,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import Footer from './Footer';
+import { useAuth } from '../contexts/AuthContext';
 
 // Utility function to determine color based on grade
 const getGradeColor = (grade) => {
@@ -26,6 +27,7 @@ const getGradeColor = (grade) => {
 };
 
 const InvestmentForm = () => {
+  const { user, saveInvestment } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -107,29 +109,29 @@ const InvestmentForm = () => {
     }
   };
 
-  const handleSaveInvestment = () => {
-    if (!analysis) return;
-
-    const newInvestment = {
-      id: Date.now(),
-      name: analysis.name || 'N/A',
-      type: analysis.type || 'N/A',
-      amount: analysis.amount || 'N/A',
-      purchaseDate: new Date().toISOString().split('T')[0],
-      quantity: analysis.quantity || '',
-      ticker: analysis.ticker || '',
-      additionalNotes: additionalNotes,
-      grade: analysis.grade,
-      riskScore: analysis.riskScore,
-      riskExplanation: analysis.riskExplanation,
-      roiEstimate: analysis.roiEstimate,
-      explanation: analysis.explanation,
-      roiScenarios: analysis.roiScenarios || { pessimistic: 0, realistic: 0, optimistic: 0 },
-    };
-
-    const investments = JSON.parse(localStorage.getItem('investments') || '[]');
-    localStorage.setItem('investments', JSON.stringify([...investments, newInvestment]));
-    navigate('/dashboard');
+  const handleSaveInvestment = async () => {
+    if (!user) {
+      // Optionally show an error or redirect to login
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const investmentData = {
+        // ...collect form data here...
+      };
+      const { error } = await saveInvestment(user.id, investmentData);
+      if (error) {
+        setError(error.message);
+      } else {
+        // Optionally redirect or show a success message
+        navigate('/dashboard');
+      }
+    } catch (err) {
+      setError('Failed to save investment.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

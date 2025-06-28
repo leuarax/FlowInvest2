@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db } from '../utils/supabase';
+import { supabase } from '../utils/supabase';
 
 const AuthContext = createContext({});
 
@@ -12,126 +12,100 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Fetch current user/session on mount
   useEffect(() => {
-    // Get initial user
-    const getInitialUser = async () => {
-      try {
-        const currentUser = await auth.getCurrentUser();
-        console.log('Initial user:', currentUser);
-        setUser(currentUser);
-        
-        if (currentUser) {
-          const { data: profile } = await db.getUserProfile(currentUser.id);
-          setUserProfile(profile);
-        }
-      } catch (err) {
-        console.error('Error fetching initial user:', err);
-      }
-      console.log('AuthContext: setLoading(false) after getInitialUser');
+    const getSession = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      setUser(data?.user || null);
       setLoading(false);
-      console.log('AuthContext: loading is now', false);
     };
+    getSession();
 
-    getInitialUser();
-
-    // Listen for auth changes
-    const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, session?.user);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        db.getUserProfile(session.user.id)
-          .then(async ({ data: profile }) => {
-            if (!profile) {
-              // No profile exists, create one using onboarding data if available
-              let onboardingData = null;
-              try {
-                const savedProfile = localStorage.getItem('userProfile');
-                if (savedProfile) {
-                  onboardingData = JSON.parse(savedProfile);
-                  localStorage.removeItem('userProfile');
-                }
-              } catch (e) {
-                console.error('Error parsing onboarding data from localStorage:', e);
-              }
-              if (onboardingData) {
-                console.log('Creating user profile for new user:', onboardingData);
-                const { data: newProfile, error } = await db.saveUserProfile(session.user.id, onboardingData);
-                if (!error) {
-                  setUserProfile(newProfile);
-                } else {
-                  console.error('Error creating user profile:', error);
-                }
-              } else {
-                // Create a minimal profile if no onboarding data
-                const { data: newProfile, error } = await db.saveUserProfile(session.user.id, {});
-                if (!error) {
-                  setUserProfile(newProfile);
-                } else {
-                  console.error('Error creating minimal user profile:', error);
-                }
-              }
-            } else {
-              setUserProfile(profile);
-            }
-            console.log('AuthContext: setLoading(false) after onAuthStateChange (user present)');
-            setLoading(false);
-            console.log('AuthContext: loading is now', false);
-          })
-          .catch((err) => {
-            console.error('Error in onAuthStateChange (getUserProfile):', err);
-            setLoading(false);
-            console.log('AuthContext: loading is now', false);
-          });
-      } else {
-        setUserProfile(null);
-        console.log('AuthContext: setLoading(false) after onAuthStateChange (no user)');
-        setLoading(false);
-        console.log('AuthContext: loading is now', false);
-      }
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email, password) => {
-    const { data, error } = await auth.signUp(email, password);
-    if (error) console.error('Sign up error:', error);
+  // Sign up with email, password, and onboarding info
+  const signUp = async (email, password, onboardingData) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { error };
+    // After sign up, create user profile row
+    if (data.user) {
+      await saveUserProfile(data.user.id, onboardingData);
+    }
     return { data, error };
   };
 
+  // Sign in with email and password
   const signIn = async (email, password) => {
-    const { data, error } = await auth.signIn(email, password);
-    if (error) console.error('Sign in error:', error);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     return { data, error };
   };
 
+  // Sign out
   const signOut = async () => {
-    const { error } = await auth.signOut();
-    if (error) console.error('Sign out error:', error);
+    const { error } = await supabase.auth.signOut();
+    if (!error) setUser(null);
     return { error };
   };
 
-  const signInWithGoogle = async () => {
-    const { data, error } = await auth.signInWithGoogle();
-    if (error) console.error('Google sign in error:', error);
+  // Save or update user profile (onboarding info)
+  const saveUserProfile = async (userId, profileData) => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .upsert({
+        user_id: userId,
+        ...profileData,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: ['user_id'] });
+    if (!error) setUserProfile(data);
     return { data, error };
   };
 
-  const signInWithApple = async () => {
-    const { data, error } = await auth.signInWithApple();
-    if (error) console.error('Apple sign in error:', error);
+  // Save a new investment
+  const saveInvestment = async (userId, investmentData) => {
+    const { data, error } = await supabase
+      .from('investments')
+      .insert({
+        user_id: userId,
+        ...investmentData,
+        created_at: new Date().toISOString(),
+      });
     return { data, error };
   };
 
-  const saveUserProfile = async (profileData) => {
-    if (!user) return { error: 'No user logged in' };
-    
-    const { data, error } = await db.saveUserProfile(user.id, profileData);
-    if (!error) {
-      setUserProfile(data);
-    }
-    if (error) console.error('Save user profile error:', error);
+  // Fetch user investments
+  const getUserInvestments = async (userId) => {
+    const { data, error } = await supabase
+      .from('investments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    return { data, error };
+  };
+
+  // Save a new real estate investment
+  const saveRealEstate = async (userId, realEstateData) => {
+    const { data, error } = await supabase
+      .from('real_estate_investments')
+      .insert({
+        user_id: userId,
+        ...realEstateData,
+        created_at: new Date().toISOString(),
+      });
+    return { data, error };
+  };
+
+  // Fetch user real estate investments
+  const getUserRealEstate = async (userId) => {
+    const { data, error } = await supabase
+      .from('real_estate_investments')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
     return { data, error };
   };
 
@@ -142,9 +116,11 @@ export const AuthProvider = ({ children }) => {
     signUp,
     signIn,
     signOut,
-    signInWithGoogle,
-    signInWithApple,
     saveUserProfile,
+    saveInvestment,
+    getUserInvestments,
+    saveRealEstate,
+    getUserRealEstate,
   };
 
   return (
