@@ -23,6 +23,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 console.log('Dashboard rendered');
 
+useEffect(() => {
+  console.log('Dashboard mounted');
+}, []);
+
 const getGradeColor = (grade) => {
   if (!grade) return '#64748b';
   const upperGrade = grade.toUpperCase();

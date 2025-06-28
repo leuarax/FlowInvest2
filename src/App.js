@@ -41,6 +41,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
   
+  console.log('Matched /dashboard route (inside ProtectedRoute)');
   return children;
 };
 
@@ -147,32 +148,27 @@ function AppRoutes() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={
         <PublicRoute>
-          {console.log('Matched /login route')}
           <Login />
         </PublicRoute>
       } />
       <Route path="/registration" element={
         <PublicRoute>
-          {console.log('Matched /registration route')}
           <Registration />
         </PublicRoute>
       } />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/dashboard" element={
         <ProtectedRoute>
-          {console.log('Matched /dashboard route')}
           <Dashboard />
         </ProtectedRoute>
       } />
       <Route path="/add-investment" element={
         <ProtectedRoute>
-          {console.log('Matched /add-investment route')}
           <InvestmentForm />
         </ProtectedRoute>
       } />
       <Route path="/add-real-estate" element={
         <ProtectedRoute>
-          {console.log('Matched /add-real-estate route')}
           <AddRealEstate />
         </ProtectedRoute>
       } />
