@@ -11,7 +11,6 @@ import {
   Fade,
   Alert
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
@@ -20,7 +19,6 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useAuth } from '../contexts/AuthContext';
 
 const Registration = () => {
-  const navigate = useNavigate();
   const { signUp, saveUserProfile } = useAuth();
   const [formData, setFormData] = useState({
     email: '',

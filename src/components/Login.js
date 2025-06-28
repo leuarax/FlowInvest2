@@ -12,7 +12,6 @@ import {
   Fade,
   Alert
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
@@ -20,7 +19,6 @@ import LockIcon from '@mui/icons-material/Lock';
 import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
-  const navigate = useNavigate();
   const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
