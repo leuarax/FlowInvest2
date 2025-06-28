@@ -19,7 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useAuth } from '../contexts/AuthContext';
 
 const Registration = () => {
-  const { signUp, saveUserProfile } = useAuth();
+  const { signUp, saveUserProfile, signOut } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -97,8 +97,11 @@ const Registration = () => {
     setAuthError('');
     
     try {
+      // Sign out any existing user before registering a new one
+      await signOut();
+
       // Sign up the user
-      const { error } = await signUp(formData.email, formData.password);
+      const { data, error } = await signUp(formData.email, formData.password);
       
       if (error) {
         setAuthError(error.message);

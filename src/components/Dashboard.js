@@ -19,6 +19,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import FastAddPortfolio from './FastAddPortfolio';
 import Footer from './Footer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useAuth } from '../contexts/AuthContext';
 
 console.log('Dashboard rendered');
 
@@ -72,6 +73,7 @@ const Dashboard = () => {
   const [stressTestLoading, setStressTestLoading] = useState(false);
   const [stressTestAnalysis, setStressTestAnalysis] = useState(null);
   const [stressTestError, setStressTestError] = useState('');
+  const { signOut } = useAuth();
   
   const handleAddInvestments = async (newInvestments) => {
     try {
@@ -211,6 +213,14 @@ const Dashboard = () => {
 
     setLoading(false);
   }, [navigate]);
+
+  useEffect(() => {
+    const handleUnload = () => {
+      signOut();
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [signOut]);
 
   const handleOpenModal = (investment) => {
     setSelectedInvestment(investment);
