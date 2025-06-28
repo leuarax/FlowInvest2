@@ -20,6 +20,8 @@ import FastAddPortfolio from './FastAddPortfolio';
 import Footer from './Footer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
+console.log('Dashboard rendered');
+
 const getGradeColor = (grade) => {
   if (!grade) return '#64748b';
   const upperGrade = grade.toUpperCase();
