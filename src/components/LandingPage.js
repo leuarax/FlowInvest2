@@ -28,6 +28,10 @@ const LandingPage = () => {
     navigate('/onboarding');
   };
 
+  const handleLogin = () => {
+    navigate('/login');
+  };
+
   const features = [
     {
       icon: <AutoAwesomeIcon sx={{ fontSize: 40 }} />,
@@ -202,6 +206,32 @@ const LandingPage = () => {
                   }}
                 >
                   Start Your Journey
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="large"
+                  onClick={handleLogin}
+                  sx={{
+                    borderColor: 'rgba(255,255,255,0.3)',
+                    color: 'white',
+                    borderRadius: '50px',
+                    px: 4,
+                    py: 2,
+                    fontSize: '1.2rem',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    backdropFilter: 'blur(10px)',
+                    background: 'rgba(255,255,255,0.1)',
+                    '&:hover': {
+                      transform: 'translateY(-3px)',
+                      borderColor: 'rgba(255,255,255,0.5)',
+                      background: 'rgba(255,255,255,0.2)',
+                      boxShadow: '0 12px 40px rgba(255,255,255,0.2)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Sign In
                 </Button>
               </Box>
             </Box>

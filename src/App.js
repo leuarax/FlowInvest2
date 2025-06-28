@@ -12,6 +12,11 @@ import InvestmentForm from './components/InvestmentForm';
 import AddRealEstate from './components/AddRealEstate';
 import Imprint from './components/Imprint';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import Login from './components/Login';
+import Registration from './components/Registration';
+
+// Context
+import { AuthProvider } from './contexts/AuthContext';
 
 const theme = createTheme({
   palette: {
@@ -83,26 +88,31 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box sx={{
-        minHeight: '100vh',
-        bgcolor: 'background.default',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/add-investment" element={<InvestmentForm />} />
-          <Route path="/add-real-estate" element={<AddRealEstate />} />
-          <Route path="/imprint" element={<Imprint />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        </Routes>
-      </Box>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/registration" element={<Registration />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/add-investment" element={<InvestmentForm />} />
+            <Route path="/add-real-estate" element={<AddRealEstate />} />
+            <Route path="/imprint" element={<Imprint />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          </Routes>
+        </Box>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 
 export default App;
+

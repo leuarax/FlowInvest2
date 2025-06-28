@@ -90,8 +90,8 @@ const Imprint = () => {
               </Typography>
               
               <Typography variant="body1" sx={{ mb: 1, lineHeight: 1.6 }}>
-                <strong>Email:</strong> <Link href="mailto:david.habinski07@gmail.com" sx={{ color: '#667eea', textDecoration: 'none' }}>
-                  david.habinski07@gmail.com
+                <strong>Email:</strong> <Link href="mailto:flowinvest.general@gmail.com" sx={{ color: '#667eea', textDecoration: 'none' }}>
+                  flowinvest.general@gmail.com
                 </Link>
               </Typography>
             </Box>

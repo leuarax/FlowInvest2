@@ -103,14 +103,27 @@ const PrivacyPolicy = () => {
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              4. Data Security
+              4. Data Processing and Storage
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
+              We use Supabase, a third-party service provider, to process and store your data. Supabase provides:
+              <ul style={{ marginTop: 8, marginBottom: 8, paddingLeft: 24 }}>
+                <li><b>Authentication Services:</b> Secure user registration, login, and session management</li>
+                <li><b>Database Storage:</b> Secure storage of your profile information, investment data, and preferences</li>
+                <li><b>Data Security:</b> Industry-standard encryption and security measures to protect your information</li>
+              </ul>
+              Supabase is a service provided by Supabase Inc. and is subject to their own privacy policy, which can be found at <Link href="https://supabase.com/privacy" target="_blank" sx={{ color: '#667eea' }}>https://supabase.com/privacy</Link>. By using FlowInvest, you acknowledge that your data will be processed by Supabase in accordance with their privacy policy and our data processing agreement.
+            </Typography>
+
+            <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
+              5. Data Security
             </Typography>
             <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
               We implement industry-standard security measures to protect your data from unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the internet or electronic storage is 100% secure, and we cannot guarantee absolute security.
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              5. Your Rights and Choices
+              6. Your Rights and Choices
             </Typography>
             <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
               You have the right to:
@@ -119,32 +132,32 @@ const PrivacyPolicy = () => {
                 <li>Opt out of marketing communications</li>
                 <li>Request information about how your data is processed</li>
               </ul>
-              To exercise these rights, please contact us at <b>david.habinski07@gmail.com</b>.
+              To exercise these rights, please contact us at <b>flowinvest.general@gmail.com</b>.
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              6. International Data Transfers
+              7. International Data Transfers
             </Typography>
             <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
               Your information may be transferred to and processed in countries outside your own. We ensure appropriate safeguards are in place to protect your data in accordance with applicable laws.
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              7. Children's Privacy
+              8. Children's Privacy
             </Typography>
             <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
               FlowInvest is not intended for children under the age of 18. We do not knowingly collect personal information from children. If you believe a child has provided us with personal data, please contact us immediately.
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              8. Changes to This Privacy Policy
+              9. Changes to This Privacy Policy
             </Typography>
             <Typography variant="body1" sx={{ mb: 2, lineHeight: 1.7 }}>
               We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the new policy on this page and updating the effective date below.
             </Typography>
 
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 2, color: '#1e293b' }}>
-              9. Contact Us
+              10. Contact Us
             </Typography>
             <Typography variant="body1" sx={{ mb: 4, lineHeight: 1.7 }}>
               If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:
@@ -153,7 +166,7 @@ const PrivacyPolicy = () => {
               Tübingerstraße 10<br />
               71093 Weil im Schönbuch<br />
               Germany<br />
-              <b>Email:</b> david.habinski07@gmail.com
+              <b>Email:</b> flowinvest.general@gmail.com
             </Typography>
 
             <Box sx={{ 

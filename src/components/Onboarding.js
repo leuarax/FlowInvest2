@@ -62,7 +62,7 @@ const Onboarding = () => {
       setLoading(true);
       try {
         localStorage.setItem('userProfile', JSON.stringify(formData));
-        navigate('/dashboard');
+        navigate('/registration');
       } catch (error) {
         console.error('Error saving profile:', error);
         setLoading(false);
@@ -434,7 +434,7 @@ const Onboarding = () => {
                 ml: currentStep > 0 ? 'auto' : 0
               }}
             >
-              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : currentStep === 4 ? 'Get Started' : 'Next'}
+              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : currentStep === 4 ? 'Continue to Registration' : 'Next'}
             </Button>
           </Box>
         </Paper>
