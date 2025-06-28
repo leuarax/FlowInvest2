@@ -33,8 +33,8 @@ export const auth = {
 
   // Get current user
   getCurrentUser: async () => {
-    const { data: { session } } = await supabase.auth.getUser()
-    return user
+    const { data } = await supabase.auth.getUser();
+    return data?.user;
   },
 
   // Listen to auth changes
