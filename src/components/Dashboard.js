@@ -23,41 +23,6 @@ import { useAuth } from '../contexts/AuthContext';
 
 console.log('Dashboard rendered');
 
-useEffect(() => {
-  console.log('Dashboard mounted');
-}, []);
-
-const getGradeColor = (grade) => {
-  if (!grade) return '#64748b';
-  const upperGrade = grade.toUpperCase();
-  if (upperGrade.startsWith('A')) return '#10b981';
-  if (upperGrade.startsWith('B')) return '#f59e0b';
-  if (upperGrade.startsWith('C')) return '#f97316';
-  if (upperGrade.startsWith('D')) return '#ef4444';
-  if (upperGrade.startsWith('F')) return '#dc2626';
-  return '#64748b';
-};
-
-const getGradeGradient = (grade) => {
-  if (!grade) return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-  const upperGrade = grade.toUpperCase();
-  if (upperGrade.startsWith('A')) return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-  if (upperGrade.startsWith('B')) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-  if (upperGrade.startsWith('C')) return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
-  if (upperGrade.startsWith('D')) return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-  if (upperGrade.startsWith('F')) return 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
-  return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-};
-
-// Helper function to format ROI values (handles both decimal and percentage formats)
-const formatROI = (value) => {
-  if (value === undefined || value === null) return '0.0';
-  const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-  // If the value is less than 1, assume it's a decimal and multiply by 100
-  const displayValue = Math.abs(numValue) < 1 ? numValue * 100 : numValue;
-  return displayValue.toFixed(1);
-};
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -79,6 +44,41 @@ const Dashboard = () => {
   const [stressTestError, setStressTestError] = useState('');
   const { signOut } = useAuth();
   
+  React.useEffect(() => {
+    console.log('Dashboard mounted');
+  }, []);
+
+  const getGradeColor = (grade) => {
+    if (!grade) return '#64748b';
+    const upperGrade = grade.toUpperCase();
+    if (upperGrade.startsWith('A')) return '#10b981';
+    if (upperGrade.startsWith('B')) return '#f59e0b';
+    if (upperGrade.startsWith('C')) return '#f97316';
+    if (upperGrade.startsWith('D')) return '#ef4444';
+    if (upperGrade.startsWith('F')) return '#dc2626';
+    return '#64748b';
+  };
+
+  const getGradeGradient = (grade) => {
+    if (!grade) return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+    const upperGrade = grade.toUpperCase();
+    if (upperGrade.startsWith('A')) return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+    if (upperGrade.startsWith('B')) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+    if (upperGrade.startsWith('C')) return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
+    if (upperGrade.startsWith('D')) return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+    if (upperGrade.startsWith('F')) return 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
+    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+  };
+
+  // Helper function to format ROI values (handles both decimal and percentage formats)
+  const formatROI = (value) => {
+    if (value === undefined || value === null) return '0.0';
+    const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
+    // If the value is less than 1, assume it's a decimal and multiply by 100
+    const displayValue = Math.abs(numValue) < 1 ? numValue * 100 : numValue;
+    return displayValue.toFixed(1);
+  };
+
   const handleAddInvestments = async (newInvestments) => {
     try {
       // Process each new investment to ensure required fields and get analysis
