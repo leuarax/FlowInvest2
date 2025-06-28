@@ -16,8 +16,9 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useAuth } from '../contexts/AuthContext';
+import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const Registration = () => {
   const { signUp } = useAuth();
@@ -26,19 +27,19 @@ const Registration = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    displayName: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
-  const [onboardingData, setOnboardingData] = useState(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     // Get onboarding data from localStorage
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
-      setOnboardingData(JSON.parse(savedProfile));
+      // setOnboardingData(JSON.parse(savedProfile));
     }
   }, []);
 
@@ -56,13 +57,17 @@ const Registration = () => {
       });
     }
     // Clear auth error when user starts typing
-    if (authError) {
-      setAuthError('');
+    if (error) {
+      setError('');
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
+    
+    if (!formData.displayName) {
+      newErrors.displayName = 'Full name is required';
+    }
     
     if (!formData.email) {
       newErrors.email = 'Email is required';
@@ -96,18 +101,49 @@ const Registration = () => {
     }
 
     setLoading(true);
-    setAuthError('');
-    
+    setError('');
+
     try {
-      const { error } = await signUp(formData.email, formData.password, onboardingData);
+      console.log('Starting registration process...');
+      
+      // Get onboarding data from localStorage if available
+      const onboardingData = localStorage.getItem('onboardingData');
+      const parsedOnboardingData = onboardingData ? JSON.parse(onboardingData) : null;
+      
+      console.log('Onboarding data:', parsedOnboardingData);
+
+      const { user, error } = await signUp(
+        formData.email, 
+        formData.password, 
+        formData.displayName,
+        parsedOnboardingData
+      );
+      
       if (error) {
-        setAuthError(error.message);
-      } else {
-        localStorage.removeItem('userProfile');
+        console.error('Registration error:', error);
+        
+        // Handle specific Firebase errors
+        if (error.code === 'auth/email-already-in-use') {
+          setError('This email is already registered. Please try logging in instead.');
+        } else if (error.code === 'auth/weak-password') {
+          setError('Password is too weak. Please choose a stronger password.');
+        } else if (error.code === 'auth/invalid-email') {
+          setError('Please enter a valid email address.');
+        } else {
+          setError(error.message || 'Registration failed. Please try again.');
+        }
+        return;
+      }
+
+      if (user) {
+        console.log('Registration successful, user created:', user);
+        // Clear onboarding data from localStorage
+        localStorage.removeItem('onboardingData');
         navigate('/dashboard');
       }
     } catch (error) {
-      setAuthError('An unexpected error occurred. Please try again.');
+      console.error('Unexpected registration error:', error);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -185,7 +221,7 @@ const Registration = () => {
             </Alert>
 
             {/* Error Alert */}
-            {authError && (
+            {error && (
               <Alert 
                 severity="error" 
                 sx={{ 
@@ -196,12 +232,43 @@ const Registration = () => {
                   color: '#b91c1c'
                 }}
               >
-                {authError}
+                {error}
               </Alert>
             )}
 
             {/* Registration Form */}
             <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
+              <TextField
+                fullWidth
+                name="displayName"
+                label="Full Name"
+                value={formData.displayName}
+                onChange={handleInputChange}
+                error={!!errors.displayName}
+                helperText={errors.displayName}
+                variant="outlined"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <PersonIcon sx={{ color: '#667eea' }} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  mb: 3,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    background: 'rgba(248, 250, 252, 0.8)',
+                    '&:hover fieldset': {
+                      borderColor: '#667eea'
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#667eea'
+                    }
+                  }
+                }}
+              />
+
               <TextField
                 fullWidth
                 name="email"
@@ -342,6 +409,27 @@ const Registration = () => {
                 }}
               >
                 {loading ? 'Creating Account...' : 'Create Account'}
+              </Button>
+            </Box>
+
+            {/* Sign In Link */}
+            <Box sx={{ textAlign: 'center', mt: 3 }}>
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
+                Already have an account?
+              </Typography>
+              <Button
+                variant="text"
+                onClick={() => navigate('/login')}
+                sx={{
+                  color: '#667eea',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': {
+                    background: 'rgba(102, 126, 234, 0.1)'
+                  }
+                }}
+              >
+                Sign In
               </Button>
             </Box>
           </Paper>

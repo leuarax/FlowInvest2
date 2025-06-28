@@ -47,8 +47,8 @@ const ProtectedRoute = ({ children }) => {
 
 // Public Route Component (redirects to dashboard if already authenticated)
 const PublicRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  console.log('PublicRoute', { loading, user });
+  const { user, userProfile, loading } = useAuth();
+  console.log('PublicRoute', { loading, user, userProfile });
   
   if (loading) {
     return (
@@ -64,7 +64,9 @@ const PublicRoute = ({ children }) => {
     );
   }
   
-  if (user) {
+  // Only redirect to dashboard if user has both auth and profile
+  if (user && userProfile) {
+    console.log('User authenticated with profile, redirecting to dashboard');
     return <Navigate to="/dashboard" replace />;
   }
   

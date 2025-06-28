@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPortfolioAnalysis, analyzeInvestment } from '../utils/openai';
 import { 
@@ -25,6 +25,7 @@ console.log('Dashboard rendered');
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { user, userProfile, getUserInvestments, saveInvestment, deleteInvestment: deleteInvestmentFromFirebase } = useAuth();
   const [loading, setLoading] = useState(true);
   const [investments, setInvestments] = useState([]);
   const [stats, setStats] = useState({
@@ -42,7 +43,6 @@ const Dashboard = () => {
   const [stressTestLoading, setStressTestLoading] = useState(false);
   const [stressTestAnalysis, setStressTestAnalysis] = useState(null);
   const [stressTestError, setStressTestError] = useState('');
-  const { signOut } = useAuth();
   
   React.useEffect(() => {
     console.log('Dashboard mounted');
@@ -83,8 +83,6 @@ const Dashboard = () => {
     try {
       // Process each new investment to ensure required fields and get analysis
       const processedInvestments = await Promise.all(newInvestments.map(async (inv) => {
-
-        
         // Basic investment data
         const baseInvestment = {
           ...inv,
@@ -94,12 +92,10 @@ const Dashboard = () => {
           riskScore: inv.riskScore || 5,
           grade: inv.grade || 'B',
           date: inv.date || new Date().toISOString().split('T')[0],
-          // Don't include duration/term as it's not needed
         };
 
         try {
           // Get analysis for the investment
-          const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
           const analysis = await analyzeInvestment(
             {
               ...baseInvestment,
@@ -138,93 +134,86 @@ const Dashboard = () => {
         }
       }));
 
-      // Update investments in state and localStorage
-      const updatedInvestments = [...investments, ...processedInvestments];
-      setInvestments(updatedInvestments);
-      localStorage.setItem('investments', JSON.stringify(updatedInvestments));
-      
-      // Recalculate stats
-      const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount || 0), 0);
-      const avgROI = updatedInvestments.length > 0 
-        ? updatedInvestments.reduce((acc, inv) => {
-            let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
-            if (inv.type === 'Real Estate') {
-              // Annualize ROI and add annualized cashflow as percent of amount
-              const amount = parseFloat(inv.amount) || 1;
-              const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
-                ? parseFloat(inv.cashflowAfterMortgage)
-                : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
-              const annualCashflow = netCashflow * 12;
-              const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
-              roi = roi * 12 + cashflowROI;
-            }
-            return acc + (isNaN(roi) ? 0 : roi);
-          }, 0) / updatedInvestments.length 
-        : 0;
-      const avgRisk = updatedInvestments.length > 0 
-        ? updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore || 0), 0) / updatedInvestments.length 
-        : 0;
+      // Save each investment to Firebase
+      for (const investment of processedInvestments) {
+        const { error } = await saveInvestment(investment);
+        if (error) {
+          console.error('Error saving investment:', error);
+        }
+      }
 
-      setStats({
-        totalPortfolio: total,
-        avgROI,
-        avgRisk,
-        investmentCount: updatedInvestments.length,
-      });
+      // Reload investments from Firebase
+      await loadInvestments();
+      
     } catch (error) {
       console.error('Error adding investments:', error);
       setError('Failed to add investments. Please try again.');
     }
   };
 
+  const loadInvestments = useCallback(async () => {
+    try {
+      const { investments: firebaseInvestments, error } = await getUserInvestments();
+      if (error) {
+        console.error('Error loading investments:', error);
+        setError('Failed to load investments');
+        return;
+      }
+
+      setInvestments(firebaseInvestments);
+
+      // Calculate stats
+      if (firebaseInvestments.length > 0) {
+        const total = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
+        // Calculate yearly ROI, including annualized cashflow for real estate
+        const avgROI = firebaseInvestments.reduce((acc, inv) => {
+          let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
+          if (inv.type === 'Real Estate') {
+            // Annualize ROI and add annualized cashflow as percent of amount
+            const amount = parseFloat(inv.amount) || 1;
+            const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
+              ? parseFloat(inv.cashflowAfterMortgage)
+              : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
+            const annualCashflow = netCashflow * 12;
+            const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
+            roi = roi * 12 + cashflowROI;
+          }
+          return acc + (isNaN(roi) ? 0 : roi);
+        }, 0) / firebaseInvestments.length;
+        const avgRisk = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / firebaseInvestments.length;
+
+        setStats({
+          totalPortfolio: total,
+          avgROI,
+          avgRisk,
+          investmentCount: firebaseInvestments.length,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading investments:', error);
+      setError('Failed to load investments');
+    }
+  }, [getUserInvestments]);
+
   useEffect(() => {
-    const userProfile = JSON.parse(localStorage.getItem('userProfile'));
-    if (!userProfile) {
-      navigate('/');
+    if (!user) {
+      navigate('/login');
       return;
     }
 
-    const storedInvestments = JSON.parse(localStorage.getItem('investments') || '[]');
-    setInvestments(storedInvestments);
-
-    // Calculate stats
-    if (storedInvestments.length > 0) {
-      const total = storedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-      // Calculate yearly ROI, including annualized cashflow for real estate
-      const avgROI = storedInvestments.reduce((acc, inv) => {
-        let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
-        if (inv.type === 'Real Estate') {
-          // Annualize ROI and add annualized cashflow as percent of amount
-          const amount = parseFloat(inv.amount) || 1;
-          const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
-            ? parseFloat(inv.cashflowAfterMortgage)
-            : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
-          const annualCashflow = netCashflow * 12;
-          const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
-          roi = roi * 12 + cashflowROI;
-        }
-        return acc + (isNaN(roi) ? 0 : roi);
-      }, 0) / storedInvestments.length;
-      const avgRisk = storedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / storedInvestments.length;
-
-      setStats({
-        totalPortfolio: total,
-        avgROI,
-        avgRisk,
-        investmentCount: storedInvestments.length,
-      });
+    // If user exists but no profile, show a helpful message
+    if (!userProfile) {
+      console.log('User authenticated but no profile found, showing profile setup message');
+      setError('Welcome! It looks like your profile needs to be set up. Please complete the onboarding process to continue.');
+      setLoading(false);
+      return;
     }
 
-    setLoading(false);
-  }, [navigate]);
-
-  useEffect(() => {
-    const handleUnload = () => {
-      signOut();
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    return () => window.removeEventListener('beforeunload', handleUnload);
-  }, [signOut]);
+    // User and profile exist, load investments
+    loadInvestments().finally(() => {
+      setLoading(false);
+    });
+  }, [user, userProfile, navigate, loadInvestments]);
 
   const handleOpenModal = (investment) => {
     setSelectedInvestment(investment);
@@ -239,7 +228,6 @@ const Dashboard = () => {
     setError('');
     setPortfolioAnalysis(null);
     try {
-      const userProfile = JSON.parse(localStorage.getItem('userProfile'));
       if (!userProfile) {
         throw new Error('User profile not found. Please complete onboarding first.');
       }
@@ -252,33 +240,46 @@ const Dashboard = () => {
     }
   };
 
-  const deleteInvestment = (investment) => {
+  const deleteInvestment = async (investment) => {
     if (window.confirm('Are you sure you want to delete this investment?')) {
-      const updatedInvestments = investments.filter(
-        inv => inv.name !== investment.name || inv.type !== investment.type || inv.date !== investment.date
-      );
-      localStorage.setItem('investments', JSON.stringify(updatedInvestments));
-      setInvestments(updatedInvestments);
-      
-      // Recalculate stats
-      if (updatedInvestments.length > 0) {
-        const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-        const avgROI = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate), 0) / updatedInvestments.length;
-        const avgRisk = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / updatedInvestments.length;
+      try {
+        // Delete from Firebase
+        const { error } = await deleteInvestmentFromFirebase(investment.id);
+        if (error) {
+          console.error('Error deleting investment:', error);
+          setError('Failed to delete investment');
+          return;
+        }
 
-        setStats({
-          totalPortfolio: total,
-          avgROI,
-          avgRisk,
-          investmentCount: updatedInvestments.length,
-        });
-      } else {
-        setStats({
-          totalPortfolio: 0,
-          avgROI: 0,
-          avgRisk: 0,
-          investmentCount: 0,
-        });
+        // Remove from local state
+        const updatedInvestments = investments.filter(
+          inv => inv.id !== investment.id
+        );
+        setInvestments(updatedInvestments);
+        
+        // Recalculate stats
+        if (updatedInvestments.length > 0) {
+          const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
+          const avgROI = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate), 0) / updatedInvestments.length;
+          const avgRisk = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / updatedInvestments.length;
+
+          setStats({
+            totalPortfolio: total,
+            avgROI,
+            avgRisk,
+            investmentCount: updatedInvestments.length,
+          });
+        } else {
+          setStats({
+            totalPortfolio: 0,
+            avgROI: 0,
+            avgRisk: 0,
+            investmentCount: 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error deleting investment:', error);
+        setError('Failed to delete investment');
       }
     }
   };
@@ -297,7 +298,6 @@ const Dashboard = () => {
     setStressTestError('');
     setStressTestAnalysis(null);
     try {
-      const userProfile = JSON.parse(localStorage.getItem('userProfile'));
       let res, data;
       
       // Try local endpoint first
@@ -1759,16 +1759,54 @@ const Dashboard = () => {
         {/* Error Display */}
         {error && (
           <Paper sx={{
-            background: 'rgba(239, 68, 68, 0.1)',
+            background: error.includes('profile needs to be set up') 
+              ? 'rgba(59, 130, 246, 0.1)' 
+              : 'rgba(239, 68, 68, 0.1)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
+            border: '1px solid',
+            borderColor: error.includes('profile needs to be set up') 
+              ? 'rgba(59, 130, 246, 0.3)' 
+              : 'rgba(239, 68, 68, 0.3)',
             borderRadius: '12px',
             p: 3,
             mt: 4
           }}>
-            <Typography sx={{ color: '#ef4444', fontWeight: 600 }}>
-              Error: {error}
-            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <Typography sx={{ 
+                color: error.includes('profile needs to be set up') ? '#3b82f6' : '#ef4444', 
+                fontWeight: 600,
+                mb: 2
+              }}>
+                {error.includes('profile needs to be set up') ? 'Welcome to FlowInvest!' : `Error: ${error}`}
+              </Typography>
+              
+              {error.includes('profile needs to be set up') && (
+                <>
+                  <Typography sx={{ color: '#64748b', mb: 3, maxWidth: '500px' }}>
+                    It looks like your profile needs to be set up. Please complete the onboarding process to start using FlowInvest.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    onClick={() => navigate('/onboarding')}
+                    sx={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: '12px',
+                      px: 4,
+                      py: 1.5,
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                      },
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    Complete Onboarding
+                  </Button>
+                </>
+              )}
+            </Box>
           </Paper>
         )}
       </Container>

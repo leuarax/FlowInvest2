@@ -61,7 +61,7 @@ const Onboarding = () => {
       
       setLoading(true);
       try {
-        localStorage.setItem('userProfile', JSON.stringify(formData));
+        localStorage.setItem('onboardingData', JSON.stringify(formData));
         navigate('/registration');
       } catch (error) {
         console.error('Error saving profile:', error);

@@ -16,8 +16,8 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
-import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const { signIn } = useAuth();
@@ -52,43 +52,27 @@ const Login = () => {
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
     setLoading(true);
     setAuthError('');
-    
+
     try {
-      const { error } = await signIn(formData.email, formData.password);
+      console.log('Attempting to sign in with email:', formData.email);
+      const { user, error } = await signIn(formData.email, formData.password);
+      
       if (error) {
+        console.error('Login error:', error);
         setAuthError(error.message);
-      } else {
+        return;
+      }
+
+      if (user) {
+        console.log('Login successful, user:', user);
         navigate('/dashboard');
       }
     } catch (error) {
+      console.error('Unexpected login error:', error);
       setAuthError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

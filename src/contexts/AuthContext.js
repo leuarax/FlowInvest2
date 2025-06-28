@@ -1,112 +1,182 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { supabase } from '../utils/supabase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  signUp as firebaseSignUp, 
+  signIn as firebaseSignIn, 
+  signOutUser as firebaseSignOut,
+  createUserProfile,
+  getUserProfile,
+  saveInvestment as firebaseSaveInvestment,
+  getUserInvestments as firebaseGetUserInvestments,
+  deleteInvestment as firebaseDeleteInvestment,
+  onAuthStateChange
+} from '../utils/firebase';
 
-const AuthContext = createContext({});
+const AuthContext = createContext();
 
 export const useAuth = () => {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState(null);
 
-  // Fetch current user/session on mount
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data?.user || null);
+    const unsubscribe = onAuthStateChange(async (user) => {
+      console.log('Auth state changed:', user);
+      setUser(user);
+      
+      if (user) {
+        console.log('User authenticated, fetching profile for:', user.uid);
+        // Get user profile from Firestore
+        const { profile, error } = await getUserProfile(user.uid);
+        if (!error && profile) {
+          console.log('User profile found:', profile);
+          setUserProfile(profile);
+        } else {
+          console.log('No user profile found or error:', error);
+          setUserProfile(null);
+        }
+      } else {
+        console.log('No user authenticated, clearing profile');
+        setUserProfile(null);
+      }
+      
       setLoading(false);
-    };
-    getSession();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
     });
-    return () => subscription.unsubscribe();
+
+    return unsubscribe;
   }, []);
 
-  // Sign up with email, password, and onboarding info
-  const signUp = async (email, password, onboardingData) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    if (error) return { error };
-    // After sign up, create user profile row
-    if (data.user) {
-      await saveUserProfile(data.user.id, onboardingData);
+  const signUp = async (email, password, displayName, onboardingData = null) => {
+    try {
+      setLoading(true);
+      const { user: newUser, error } = await firebaseSignUp(email, password, displayName);
+      
+      if (error) {
+        throw error;
+      }
+
+      // Create user profile in Firestore
+      const profileData = {
+        displayName,
+        email,
+        ...onboardingData
+      };
+
+      const { error: profileError } = await createUserProfile(newUser.uid, profileData);
+      
+      if (profileError) {
+        console.error('Error creating user profile:', profileError);
+      }
+
+      return { user: newUser, error: null };
+    } catch (error) {
+      console.error('Sign up error:', error);
+      return { user: null, error };
+    } finally {
+      setLoading(false);
     }
-    return { data, error };
   };
 
-  // Sign in with email and password
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    return { data, error };
+    try {
+      setLoading(true);
+      const { user: signedInUser, error } = await firebaseSignIn(email, password);
+      
+      if (error) {
+        throw error;
+      }
+
+      return { user: signedInUser, error: null };
+    } catch (error) {
+      console.error('Sign in error:', error);
+      return { user: null, error };
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Sign out
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (!error) setUser(null);
-    return { error };
+    try {
+      setLoading(true);
+      const { error } = await firebaseSignOut();
+      
+      if (error) {
+        throw error;
+      }
+
+      setUser(null);
+      setUserProfile(null);
+      return { error: null };
+    } catch (error) {
+      console.error('Sign out error:', error);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Save or update user profile (onboarding info)
-  const saveUserProfile = async (userId, profileData) => {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .upsert({
-        user_id: userId,
-        ...profileData,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: ['user_id'] });
-    if (!error) setUserProfile(data);
-    return { data, error };
+  const saveInvestment = async (investmentData) => {
+    if (!user) {
+      return { id: null, error: new Error('User not authenticated') };
+    }
+
+    try {
+      const { id, error } = await firebaseSaveInvestment(user.uid, investmentData);
+      
+      if (error) {
+        throw error;
+      }
+
+      return { id, error: null };
+    } catch (error) {
+      console.error('Save investment error:', error);
+      return { id: null, error };
+    }
   };
 
-  // Save a new investment
-  const saveInvestment = async (userId, investmentData) => {
-    const { data, error } = await supabase
-      .from('investments')
-      .insert({
-        user_id: userId,
-        ...investmentData,
-        created_at: new Date().toISOString(),
-      });
-    return { data, error };
+  const getUserInvestments = async () => {
+    if (!user) {
+      return { investments: [], error: new Error('User not authenticated') };
+    }
+
+    try {
+      const { investments, error } = await firebaseGetUserInvestments(user.uid);
+      
+      if (error) {
+        throw error;
+      }
+
+      return { investments, error: null };
+    } catch (error) {
+      console.error('Get investments error:', error);
+      return { investments: [], error };
+    }
   };
 
-  // Fetch user investments
-  const getUserInvestments = async (userId) => {
-    const { data, error } = await supabase
-      .from('investments')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    return { data, error };
-  };
+  const deleteInvestment = async (investmentId) => {
+    if (!user) {
+      return { error: new Error('User not authenticated') };
+    }
 
-  // Save a new real estate investment
-  const saveRealEstate = async (userId, realEstateData) => {
-    const { data, error } = await supabase
-      .from('real_estate_investments')
-      .insert({
-        user_id: userId,
-        ...realEstateData,
-        created_at: new Date().toISOString(),
-      });
-    return { data, error };
-  };
+    try {
+      const { error } = await firebaseDeleteInvestment(investmentId);
+      
+      if (error) {
+        throw error;
+      }
 
-  // Fetch user real estate investments
-  const getUserRealEstate = async (userId) => {
-    const { data, error } = await supabase
-      .from('real_estate_investments')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    return { data, error };
+      return { error: null };
+    } catch (error) {
+      console.error('Delete investment error:', error);
+      return { error };
+    }
   };
 
   const value = {
@@ -116,11 +186,9 @@ export const AuthProvider = ({ children }) => {
     signUp,
     signIn,
     signOut,
-    saveUserProfile,
     saveInvestment,
     getUserInvestments,
-    saveRealEstate,
-    getUserRealEstate,
+    deleteInvestment
   };
 
   return (

@@ -111,24 +111,31 @@ const InvestmentForm = () => {
 
   const handleSaveInvestment = async () => {
     if (!user) {
-      // Optionally show an error or redirect to login
+      setError('You must be logged in to save investments');
       return;
     }
+
     setLoading(true);
     setError('');
+
     try {
       const investmentData = {
         // ...collect form data here...
       };
-      const { error } = await saveInvestment(user.id, investmentData);
+      
+      const { id, error } = await saveInvestment(investmentData);
+      
       if (error) {
         setError(error.message);
-      } else {
-        // Optionally redirect or show a success message
+        return;
+      }
+
+      if (id) {
         navigate('/dashboard');
       }
-    } catch (err) {
-      setError('Failed to save investment.');
+    } catch (error) {
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Save investment error:', error);
     } finally {
       setLoading(false);
     }
