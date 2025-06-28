@@ -11,6 +11,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import EuroIcon from '@mui/icons-material/Euro';
+import Footer from './Footer';
 
 const getGradeColor = (grade) => {
   if (!grade) return '#64748b';
@@ -120,9 +121,12 @@ const AddRealEstate = () => {
     <Box sx={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      py: 4
+      pt: 4,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center'
     }}>
-      <Container maxWidth="lg">
+      <Container maxWidth="lg" sx={{ flex: 1 }}>
         {/* Header Section */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
@@ -158,16 +162,17 @@ const AddRealEstate = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={4}>
+        <Grid container spacing={4} sx={{ flex: 1, minHeight: 0 }}>
           {/* Left Side: Input Form */}
-          <Grid item xs={12} md={5}>
+          <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column' }}>
             <Paper sx={{ 
               background: 'rgba(255,255,255,0.95)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.3)',
               borderRadius: '24px',
               p: 4,
-              boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+              flex: 1
             }}>
               <Box sx={{ mb: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -532,16 +537,16 @@ const AddRealEstate = () => {
             </Paper>
           </Grid>
 
-          {/* Right Side: AI Analysis Display */}
-          <Grid item xs={12} md={7}>
+          {/* Right Side: Analysis Results */}
+          <Grid item xs={12} md={7} sx={{ display: 'flex', flexDirection: 'column' }}>
             <Paper sx={{ 
               background: 'rgba(255,255,255,0.95)',
               backdropFilter: 'blur(20px)',
               border: '1px solid rgba(255,255,255,0.3)',
               borderRadius: '24px',
               p: 4,
-              minHeight: '600px',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+              boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+              flex: 1
             }}>
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h5" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
@@ -869,6 +874,8 @@ const AddRealEstate = () => {
           </Grid>
         </Grid>
       </Container>
+      
+      <Footer />
     </Box>
   );
 };

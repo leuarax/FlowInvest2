@@ -48,17 +48,14 @@ const Onboarding = () => {
     });
   };
 
-  const [submitted, setSubmitted] = useState(false);
-
   const handleNext = () => {
-    if (currentStep === 3) {
-      setSubmitted(true);
-
+    if (currentStep === 4) {
       if (formData.interests.length === 0) {
         alert('Please select at least one interest.');
         return;
       }
-      if (!formData.primaryGoal) {
+      if (!formData.primaryGoal.trim()) {
+        alert('Please enter your investment goals.');
         return;
       }
       
@@ -76,13 +73,16 @@ const Onboarding = () => {
     if (currentStep === 0 && !formData.name) return;
     if (currentStep === 1 && !formData.experience) return;
     if (currentStep === 2 && !formData.riskTolerance) return;
+    if (currentStep === 3 && formData.interests.length === 0) {
+      alert('Please select at least one interest.');
+      return;
+    }
 
     setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setSubmitted(false);
       setCurrentStep(currentStep - 1);
     }
   };
@@ -230,7 +230,7 @@ const Onboarding = () => {
         return (
           <Box sx={{ mt: 4 }}>
             <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-              Investment Interests & Goals
+              Investment Interests
             </Typography>
             <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
               What interests you? (Select all that apply)
@@ -288,6 +288,18 @@ const Onboarding = () => {
                 </Paper>
               ))}
             </Box>
+          </Box>
+        );
+
+      case 4:
+        return (
+          <Box sx={{ mt: 4 }}>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+              Investment Goals
+            </Typography>
+            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
+              Tell us about your investment goals and what you hope to achieve.
+            </Typography>
             <TextField
               fullWidth
               label="Your investing goals"
@@ -296,6 +308,7 @@ const Onboarding = () => {
               onChange={handleInputChange}
               multiline
               rows={4}
+              placeholder="e.g., Save for retirement, build passive income, grow wealth for children's education..."
               sx={{
                 mb: 4,
                 '& .MuiOutlinedInput-root': {
@@ -310,8 +323,6 @@ const Onboarding = () => {
                 }
               }}
               required
-              error={submitted && !formData.primaryGoal}
-              helperText={submitted && !formData.primaryGoal ? 'This field is required.' : ''}
             />
           </Box>
         );
@@ -354,16 +365,13 @@ const Onboarding = () => {
             >
               FlowInvest
             </Typography>
-            <Typography variant="h6" sx={{ color: '#1e293b', mb: 2 }}>
-              AI-Powered Investment Intelligence
-            </Typography>
             <Typography variant="body1" sx={{ color: '#64748b' }}>
               Let's get to know you better to tailor your investment experience.
             </Typography>
           </Box>
 
           <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
-            {[0, 1, 2, 3].map((index) => (
+            {[0, 1, 2, 3, 4].map((index) => (
               <Box
                 key={index}
                 sx={{
@@ -426,7 +434,7 @@ const Onboarding = () => {
                 ml: currentStep > 0 ? 'auto' : 0
               }}
             >
-              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : currentStep === 3 ? 'Get Started' : 'Next'}
+              {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : currentStep === 4 ? 'Get Started' : 'Next'}
             </Button>
           </Box>
         </Paper>

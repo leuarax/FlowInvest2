@@ -5,9 +5,13 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
 
 // Components
+import LandingPage from './components/LandingPage';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import InvestmentForm from './components/InvestmentForm';
+import AddRealEstate from './components/AddRealEstate';
+import Imprint from './components/Imprint';
+import PrivacyPolicy from './components/PrivacyPolicy';
 
 const theme = createTheme({
   palette: {
@@ -88,9 +92,13 @@ function App() {
         flexDirection: 'column',
       }}>
         <Routes>
-          <Route path="/" element={<Onboarding />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/add-investment" element={<InvestmentForm />} />
+          <Route path="/add-real-estate" element={<AddRealEstate />} />
+          <Route path="/imprint" element={<Imprint />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         </Routes>
       </Box>
     </ThemeProvider>

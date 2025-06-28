@@ -17,6 +17,7 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import HomeIcon from '@mui/icons-material/Home';
 import ChatIcon from '@mui/icons-material/Chat';
 import FastAddPortfolio from './FastAddPortfolio';
+import Footer from './Footer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const getGradeColor = (grade) => {
@@ -394,6 +395,8 @@ const Dashboard = () => {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
       '&::before': {
         content: '""',
         position: 'absolute',
@@ -405,7 +408,7 @@ const Dashboard = () => {
         pointerEvents: 'none'
       }
     }}>
-      <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: 4, pb: 6 }}>
+      <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: 4, pb: 6, flex: 1 }}>
         {/* Header Section */}
         <Box sx={{ mb: 6 }}>
           <Box sx={{ 
@@ -1753,6 +1756,8 @@ const Dashboard = () => {
           </Paper>
         )}
       </Container>
+      
+      <Footer />
     </Box>
   );
 };
