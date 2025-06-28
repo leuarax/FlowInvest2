@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box } from '@mui/material';
@@ -16,7 +16,57 @@ import Login from './components/Login';
 import Registration from './components/Registration';
 
 // Context
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div>Loading...</div>
+      </Box>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+};
+
+// Public Route Component (redirects to dashboard if already authenticated)
+const PublicRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div>Loading...</div>
+      </Box>
+    );
+  }
+  
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+};
 
 const theme = createTheme({
   palette: {
@@ -86,6 +136,42 @@ const theme = createTheme({
   },
 });
 
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={
+        <PublicRoute>
+          <Login />
+        </PublicRoute>
+      } />
+      <Route path="/registration" element={
+        <PublicRoute>
+          <Registration />
+        </PublicRoute>
+      } />
+      <Route path="/onboarding" element={<Onboarding />} />
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/add-investment" element={
+        <ProtectedRoute>
+          <InvestmentForm />
+        </ProtectedRoute>
+      } />
+      <Route path="/add-real-estate" element={
+        <ProtectedRoute>
+          <AddRealEstate />
+        </ProtectedRoute>
+      } />
+      <Route path="/imprint" element={<Imprint />} />
+      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -97,17 +183,7 @@ function App() {
           display: 'flex',
           flexDirection: 'column',
         }}>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/registration" element={<Registration />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/add-investment" element={<InvestmentForm />} />
-            <Route path="/add-real-estate" element={<AddRealEstate />} />
-            <Route path="/imprint" element={<Imprint />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          </Routes>
+          <AppRoutes />
         </Box>
       </ThemeProvider>
     </AuthProvider>

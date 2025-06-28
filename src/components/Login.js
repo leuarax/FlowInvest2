@@ -9,16 +9,19 @@ import {
   Link,
   IconButton,
   InputAdornment,
-  Fade
+  Fade,
+  Alert
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -26,6 +29,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -39,6 +43,10 @@ const Login = () => {
         ...errors,
         [name]: '',
       });
+    }
+    // Clear auth error when user starts typing
+    if (authError) {
+      setAuthError('');
     }
   };
 
@@ -69,14 +77,20 @@ const Login = () => {
     }
 
     setLoading(true);
+    setAuthError('');
     
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { error } = await signIn(formData.email, formData.password);
+      
+      if (error) {
+        setAuthError(error.message);
+      }
+      // The authentication guard will handle the redirect to dashboard
+    } catch (error) {
+      setAuthError('An unexpected error occurred. Please try again.');
+    } finally {
       setLoading(false);
-      // For now, just navigate to dashboard
-      // In the future, this would handle actual authentication
-      navigate('/dashboard');
-    }, 1500);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -260,6 +274,13 @@ const Login = () => {
                 {loading ? 'Signing In...' : 'Sign In'}
               </Button>
             </Box>
+
+            {/* Auth Error Alert */}
+            {authError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {authError}
+              </Alert>
+            )}
           </Paper>
         </Fade>
       </Container>

@@ -110,7 +110,7 @@ const Registration = () => {
           await saveUserProfile(onboardingData);
           localStorage.removeItem('userProfile'); // Clean up localStorage
         }
-        navigate('/dashboard');
+        // The authentication guard will handle the redirect to dashboard
       }
     } catch (error) {
       setAuthError('An unexpected error occurred. Please try again.');
