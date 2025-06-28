@@ -201,15 +201,7 @@ const Dashboard = () => {
       return;
     }
 
-    // If user exists but no profile, show a helpful message
-    if (!userProfile) {
-      console.log('User authenticated but no profile found, showing profile setup message');
-      setError('Welcome! It looks like your profile needs to be set up. Please complete the onboarding process to continue.');
-      setLoading(false);
-      return;
-    }
-
-    // User and profile exist, load investments
+    // User exists, load investments
     loadInvestments().finally(() => {
       setLoading(false);
     });
@@ -424,6 +416,51 @@ const Dashboard = () => {
         pointerEvents: 'none'
       }
     }}>
+      {/* Loading Screen */}
+      {loading && (
+        <Box sx={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          zIndex: 9999,
+          backdropFilter: 'blur(10px)'
+        }}>
+          <CircularProgress 
+            size={80}
+            thickness={4}
+            sx={{
+              color: 'white',
+              mb: 3,
+              '& .MuiCircularProgress-circle': {
+                strokeLinecap: 'round',
+              }
+            }}
+          />
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              color: 'white',
+              fontWeight: 600,
+              textAlign: 'center',
+              background: 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              px: 3,
+              py: 1
+            }}
+          >
+            Loading your portfolio...
+          </Typography>
+        </Box>
+      )}
+
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: 4, pb: 6, flex: 1 }}>
         {/* Header Section */}
         <Box sx={{ mb: 6 }}>
@@ -461,7 +498,7 @@ const Dashboard = () => {
                   fontWeight: 400
                 }}
               >
-                Welcome back, {JSON.parse(localStorage.getItem('userProfile') || '{}').name || 'Investor'}!
+                Welcome back, {userProfile?.displayName || userProfile?.name || 'Investor'}!
               </Typography>
             </Box>
             
@@ -1756,57 +1793,19 @@ const Dashboard = () => {
           </Fade>
         </Modal>
 
-        {/* Error Display */}
-        {error && (
+        {/* Error Display - Only show actual errors, not onboarding messages */}
+        {error && !error.includes('profile needs to be set up') && (
           <Paper sx={{
-            background: error.includes('profile needs to be set up') 
-              ? 'rgba(59, 130, 246, 0.1)' 
-              : 'rgba(239, 68, 68, 0.1)',
+            background: 'rgba(239, 68, 68, 0.1)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid',
-            borderColor: error.includes('profile needs to be set up') 
-              ? 'rgba(59, 130, 246, 0.3)' 
-              : 'rgba(239, 68, 68, 0.3)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
             borderRadius: '12px',
             p: 3,
             mt: 4
           }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <Typography sx={{ 
-                color: error.includes('profile needs to be set up') ? '#3b82f6' : '#ef4444', 
-                fontWeight: 600,
-                mb: 2
-              }}>
-                {error.includes('profile needs to be set up') ? 'Welcome to FlowInvest!' : `Error: ${error}`}
-              </Typography>
-              
-              {error.includes('profile needs to be set up') && (
-                <>
-                  <Typography sx={{ color: '#64748b', mb: 3, maxWidth: '500px' }}>
-                    It looks like your profile needs to be set up. Please complete the onboarding process to start using FlowInvest.
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => navigate('/onboarding')}
-                    sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      borderRadius: '12px',
-                      px: 4,
-                      py: 1.5,
-                      fontWeight: 600,
-                      textTransform: 'none',
-                      '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                      },
-                      transition: 'all 0.3s ease'
-                    }}
-                  >
-                    Complete Onboarding
-                  </Button>
-                </>
-              )}
-            </Box>
+            <Typography sx={{ color: '#ef4444', fontWeight: 600 }}>
+              Error: {error}
+            </Typography>
           </Paper>
         )}
       </Container>

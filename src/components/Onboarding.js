@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -14,10 +14,12 @@ import {
   Paper
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { interestOptions } from '../utils/constants';
 
 const Onboarding = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,6 +29,21 @@ const Onboarding = () => {
     interests: [],
     primaryGoal: '',
   });
+
+  // Check if user is already logged in and log them out
+  useEffect(() => {
+    if (user) {
+      console.log('User is already logged in, logging out for onboarding');
+      signOut().then(() => {
+        // Clear any existing onboarding data
+        localStorage.removeItem('onboardingData');
+        localStorage.removeItem('userProfile');
+        console.log('User logged out for onboarding');
+      }).catch((error) => {
+        console.error('Error logging out for onboarding:', error);
+      });
+    }
+  }, [user, signOut]);
 
   const experienceOptions = [
     { value: 'beginner', label: 'Beginner', description: 'New to investing, learning the basics' },
