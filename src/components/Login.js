@@ -7,7 +7,6 @@ import {
   TextField,
   Paper,
   Link,
-  Divider,
   IconButton,
   InputAdornment,
   Fade
