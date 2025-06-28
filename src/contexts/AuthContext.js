@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
   // Fetch current user/session on mount
   useEffect(() => {
     const getSession = async () => {
-      const { data, error } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
       setUser(data?.user || null);
       setLoading(false);
     };
