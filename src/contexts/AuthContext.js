@@ -41,8 +41,39 @@ export const AuthProvider = ({ children }) => {
 
       if (session?.user) {
         db.getUserProfile(session.user.id)
-          .then(({ data: profile }) => {
-            setUserProfile(profile);
+          .then(async ({ data: profile }) => {
+            if (!profile) {
+              // No profile exists, create one using onboarding data if available
+              let onboardingData = null;
+              try {
+                const savedProfile = localStorage.getItem('userProfile');
+                if (savedProfile) {
+                  onboardingData = JSON.parse(savedProfile);
+                  localStorage.removeItem('userProfile');
+                }
+              } catch (e) {
+                console.error('Error parsing onboarding data from localStorage:', e);
+              }
+              if (onboardingData) {
+                console.log('Creating user profile for new user:', onboardingData);
+                const { data: newProfile, error } = await db.saveUserProfile(session.user.id, onboardingData);
+                if (!error) {
+                  setUserProfile(newProfile);
+                } else {
+                  console.error('Error creating user profile:', error);
+                }
+              } else {
+                // Create a minimal profile if no onboarding data
+                const { data: newProfile, error } = await db.saveUserProfile(session.user.id, {});
+                if (!error) {
+                  setUserProfile(newProfile);
+                } else {
+                  console.error('Error creating minimal user profile:', error);
+                }
+              }
+            } else {
+              setUserProfile(profile);
+            }
             console.log('AuthContext: setLoading(false) after onAuthStateChange (user present)');
             setLoading(false);
             console.log('AuthContext: loading is now', false);
