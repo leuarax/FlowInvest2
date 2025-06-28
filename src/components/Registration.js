@@ -101,7 +101,7 @@ const Registration = () => {
       await signOut();
 
       // Sign up the user
-      const { data, error } = await signUp(formData.email, formData.password);
+      const { error } = await signUp(formData.email, formData.password);
       
       if (error) {
         setAuthError(error.message);
