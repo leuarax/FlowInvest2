@@ -27,8 +27,9 @@ export const AuthProvider = ({ children }) => {
       } catch (err) {
         console.error('Error fetching initial user:', err);
       }
+      console.log('AuthContext: setLoading(false) after getInitialUser');
       setLoading(false);
-      console.log('Set loading to false after getInitialUser');
+      console.log('AuthContext: loading is now', false);
     };
 
     getInitialUser();
@@ -49,8 +50,9 @@ export const AuthProvider = ({ children }) => {
         console.error('Error in onAuthStateChange:', err);
       }
       
+      console.log('AuthContext: setLoading(false) after onAuthStateChange');
       setLoading(false);
-      console.log('Set loading to false after auth state change');
+      console.log('AuthContext: loading is now', false);
     });
 
     return () => subscription.unsubscribe();
