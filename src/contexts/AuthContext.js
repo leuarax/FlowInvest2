@@ -15,22 +15,27 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     // Get initial user
     const getInitialUser = async () => {
-      const currentUser = await auth.getCurrentUser();
-      setUser(currentUser);
-      
-      if (currentUser) {
-        const { data: profile } = await db.getUserProfile(currentUser.id);
-        setUserProfile(profile);
+      try {
+        const currentUser = await auth.getCurrentUser();
+        console.log('Initial user:', currentUser);
+        setUser(currentUser);
+        
+        if (currentUser) {
+          const { data: profile } = await db.getUserProfile(currentUser.id);
+          setUserProfile(profile);
+        }
+      } catch (err) {
+        console.error('Error fetching initial user:', err);
       }
-      
       setLoading(false);
+      console.log('Set loading to false after getInitialUser');
     };
 
     getInitialUser();
 
     // Listen for auth changes
     const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
+      console.log('Auth state changed:', event, session?.user);
       setUser(session?.user ?? null);
       
       if (session?.user) {
@@ -41,6 +46,7 @@ export const AuthProvider = ({ children }) => {
       }
       
       setLoading(false);
+      console.log('Set loading to false after auth state change');
     });
 
     return () => subscription.unsubscribe();
@@ -48,26 +54,31 @@ export const AuthProvider = ({ children }) => {
 
   const signUp = async (email, password) => {
     const { data, error } = await auth.signUp(email, password);
+    if (error) console.error('Sign up error:', error);
     return { data, error };
   };
 
   const signIn = async (email, password) => {
     const { data, error } = await auth.signIn(email, password);
+    if (error) console.error('Sign in error:', error);
     return { data, error };
   };
 
   const signOut = async () => {
     const { error } = await auth.signOut();
+    if (error) console.error('Sign out error:', error);
     return { error };
   };
 
   const signInWithGoogle = async () => {
     const { data, error } = await auth.signInWithGoogle();
+    if (error) console.error('Google sign in error:', error);
     return { data, error };
   };
 
   const signInWithApple = async () => {
     const { data, error } = await auth.signInWithApple();
+    if (error) console.error('Apple sign in error:', error);
     return { data, error };
   };
 
@@ -78,6 +89,7 @@ export const AuthProvider = ({ children }) => {
     if (!error) {
       setUserProfile(data);
     }
+    if (error) console.error('Save user profile error:', error);
     return { data, error };
   };
 
