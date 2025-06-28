@@ -21,6 +21,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
+  console.log('ProtectedRoute', { loading, user });
   
   if (loading) {
     return (
