@@ -35,24 +35,29 @@ export const AuthProvider = ({ children }) => {
     getInitialUser();
 
     // Listen for auth changes
-    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
       console.log('Auth state changed:', event, session?.user);
       setUser(session?.user ?? null);
-      
-      try {
-        if (session?.user) {
-          const { data: profile } = await db.getUserProfile(session.user.id);
-          setUserProfile(profile);
-        } else {
-          setUserProfile(null);
-        }
-      } catch (err) {
-        console.error('Error in onAuthStateChange:', err);
+
+      if (session?.user) {
+        db.getUserProfile(session.user.id)
+          .then(({ data: profile }) => {
+            setUserProfile(profile);
+            console.log('AuthContext: setLoading(false) after onAuthStateChange (user present)');
+            setLoading(false);
+            console.log('AuthContext: loading is now', false);
+          })
+          .catch((err) => {
+            console.error('Error in onAuthStateChange (getUserProfile):', err);
+            setLoading(false);
+            console.log('AuthContext: loading is now', false);
+          });
+      } else {
+        setUserProfile(null);
+        console.log('AuthContext: setLoading(false) after onAuthStateChange (no user)');
+        setLoading(false);
+        console.log('AuthContext: loading is now', false);
       }
-      
-      console.log('AuthContext: setLoading(false) after onAuthStateChange');
-      setLoading(false);
-      console.log('AuthContext: loading is now', false);
     });
 
     return () => subscription.unsubscribe();
