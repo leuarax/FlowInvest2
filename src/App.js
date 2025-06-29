@@ -2,7 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Box } from '@mui/material';
+import { Box, CircularProgress } from '@mui/material';
 
 // Components
 import LandingPage from './components/LandingPage';
@@ -32,7 +32,16 @@ const ProtectedRoute = ({ children }) => {
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <div>Loading...</div>
+        <CircularProgress 
+          size={80}
+          thickness={4}
+          sx={{
+            color: 'white',
+            '& .MuiCircularProgress-circle': {
+              strokeLinecap: 'round',
+            }
+          }}
+        />
       </Box>
     );
   }
@@ -59,7 +68,16 @@ const PublicRoute = ({ children }) => {
         minHeight: '100vh',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
-        <div>Loading...</div>
+        <CircularProgress 
+          size={80}
+          thickness={4}
+          sx={{
+            color: 'white',
+            '& .MuiCircularProgress-circle': {
+              strokeLinecap: 'round',
+            }
+          }}
+        />
       </Box>
     );
   }
