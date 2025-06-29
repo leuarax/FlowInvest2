@@ -1,7 +1,7 @@
 const OpenAI = require('openai');
 
-// Get API key from environment variables
-const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
+// Get API key from environment variables - use REACT_APP_ prefix for Vercel
+const apiKey = process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY;
 
 // Log environment variables (except sensitive ones)
 console.log('Environment variables available:', Object.keys(process.env));

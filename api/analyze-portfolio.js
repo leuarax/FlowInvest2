@@ -16,18 +16,18 @@ const OpenAI = require('openai');
 // Log environment variables (except sensitive ones)
 console.log('Environment:', {
   NODE_ENV: process.env.NODE_ENV,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '***' : 'Not set'
+  REACT_APP_OPENAI_API_KEY: process.env.REACT_APP_OPENAI_API_KEY ? '***' : 'Not set'
 });
 
 // __filename and __dirname are already available in CommonJS
 
 // Initialize OpenAI
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is not set in environment variables');
+if (!process.env.REACT_APP_OPENAI_API_KEY) {
+  console.error('REACT_APP_OPENAI_API_KEY is not set in environment variables');
 }
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
+  apiKey: process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY || '',
 });
 
 console.log('OpenAI client initialized');

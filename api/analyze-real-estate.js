@@ -3,13 +3,13 @@ let openai, isV4 = false;
 try {
   // Try v4+ style
   const OpenAI = require('openai');
-  openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  openai = new OpenAI({ apiKey: process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY });
   isV4 = true;
 } catch (e) {
   // Fallback to v3 style
   const { Configuration, OpenAIApi } = require('openai');
   const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
   });
   openai = new OpenAIApi(configuration);
 }

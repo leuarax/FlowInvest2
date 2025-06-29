@@ -4,7 +4,7 @@ const OpenAI = require('openai');
 
 // Initialize OpenAI
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY,
+  apiKey: process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY || process.env.OPEN_API_KEY,
   baseURL: 'https://api.openai.com/v1'
 });
 

@@ -5,7 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.REACT_APP_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
 });
 
 // Configure Multer for file uploads
