@@ -5,7 +5,9 @@ import {
   signInWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  updateProfile
+  updateProfile,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -17,7 +19,8 @@ import {
   query, 
   where, 
   getDocs,
-  deleteDoc
+  deleteDoc,
+  writeBatch
 } from 'firebase/firestore';
 
 // Your Firebase configuration
@@ -51,6 +54,9 @@ export const signUp = async (email, password, displayName) => {
       displayName: displayName
     });
     
+    // Send email verification
+    await sendEmailVerification(user);
+    
     return { user, error: null };
   } catch (error) {
     return { user: null, error };
@@ -68,9 +74,44 @@ export const signIn = async (email, password) => {
 
 export const signOutUser = async () => {
   try {
+    console.log('firebase: Starting sign out');
     await signOut(auth);
+    console.log('firebase: Sign out successful');
     return { error: null };
   } catch (error) {
+    console.error('firebase: Sign out error:', error);
+    return { error };
+  }
+};
+
+// Email verification functions
+export const checkEmailVerification = async (user) => {
+  try {
+    // Reload the user to get the latest verification status
+    await user.reload();
+    return { isVerified: user.emailVerified, error: null };
+  } catch (error) {
+    console.error('Error checking email verification:', error);
+    return { isVerified: false, error };
+  }
+};
+
+export const resendVerificationEmail = async (user) => {
+  try {
+    await sendEmailVerification(user);
+    return { error: null };
+  } catch (error) {
+    console.error('Error resending verification email:', error);
+    return { error };
+  }
+};
+
+export const sendPasswordResetEmailHandler = async (email) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    return { error: null };
+  } catch (error) {
+    console.error('Error sending password reset email:', error);
     return { error };
   }
 };
@@ -105,12 +146,64 @@ export const getUserProfile = async (userId) => {
       console.log('User profile found:', docSnap.data());
       return { profile: docSnap.data(), error: null };
     } else {
-      console.log('User profile not found');
+      console.log('User profile not found - cleaning up orphaned investments');
+      // If profile doesn't exist, clean up any orphaned investments
+      await deleteAllUserInvestments(userId);
       return { profile: null, error: null };
     }
   } catch (error) {
     console.error('Error getting user profile:', error);
     return { profile: null, error };
+  }
+};
+
+export const updateUserProfile = async (userId, updates) => {
+  try {
+    console.log('Updating user profile for:', userId, 'with updates:', updates);
+    
+    // First get the current profile to ensure we don't overwrite existing data
+    const { profile: currentProfile } = await getUserProfile(userId);
+    
+    if (!currentProfile) {
+      console.error('Cannot update profile - profile does not exist');
+      return { error: new Error('User profile not found') };
+    }
+    
+    // Merge the updates with the existing profile
+    const updatedProfile = {
+      ...currentProfile,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    await setDoc(doc(db, 'user_profiles', userId), updatedProfile);
+    
+    console.log('User profile updated successfully');
+    return { error: null };
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    return { error };
+  }
+};
+
+export const deleteUserProfile = async (userId) => {
+  try {
+    console.log('Deleting user profile and all investments for:', userId);
+    
+    // First delete all investments for this user
+    const { error: investmentsError } = await deleteAllUserInvestments(userId);
+    if (investmentsError) {
+      console.error('Error deleting user investments:', investmentsError);
+    }
+    
+    // Then delete the user profile
+    await deleteDoc(doc(db, 'user_profiles', userId));
+    console.log('User profile deleted successfully');
+    
+    return { error: null };
+  } catch (error) {
+    console.error('Error deleting user profile:', error);
+    return { error };
   }
 };
 
@@ -149,6 +242,94 @@ export const deleteInvestment = async (investmentId) => {
     return { error: null };
   } catch (error) {
     return { error };
+  }
+};
+
+export const deleteAllUserInvestments = async (userId) => {
+  try {
+    console.log('Deleting all investments for user:', userId);
+    
+    // Get all investments for this user
+    const q = query(collection(db, 'investments'), where('userId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.log('No investments found for user:', userId);
+      return { deletedCount: 0, error: null };
+    }
+    
+    // Use a batch to delete all investments efficiently
+    const batch = writeBatch(db);
+    let deletedCount = 0;
+    
+    querySnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+    
+    await batch.commit();
+    console.log(`Deleted ${deletedCount} investments for user:`, userId);
+    
+    return { deletedCount, error: null };
+  } catch (error) {
+    console.error('Error deleting all user investments:', error);
+    return { deletedCount: 0, error };
+  }
+};
+
+// Utility function to clean up orphaned investments
+export const cleanupOrphanedInvestments = async () => {
+  try {
+    console.log('Starting cleanup of orphaned investments...');
+    
+    // Get all investments
+    const investmentsQuery = query(collection(db, 'investments'));
+    const investmentsSnapshot = await getDocs(investmentsQuery);
+    
+    const batch = writeBatch(db);
+    let deletedCount = 0;
+    
+    // Check each investment to see if the user profile exists
+    for (const investmentDoc of investmentsSnapshot.docs) {
+      const investmentData = investmentDoc.data();
+      const userId = investmentData.userId;
+      
+      if (userId) {
+        try {
+          // Check if user profile exists
+          const profileDoc = await getDoc(doc(db, 'user_profiles', userId));
+          if (!profileDoc.exists()) {
+            // Profile doesn't exist, mark investment for deletion
+            batch.delete(investmentDoc.ref);
+            deletedCount++;
+            console.log(`Marking orphaned investment for deletion: ${investmentDoc.id} (user: ${userId})`);
+          }
+        } catch (profileError) {
+          console.error('Error checking profile for investment:', profileError);
+          // If we can't check the profile due to permissions, skip this investment
+          continue;
+        }
+      }
+    }
+    
+    if (deletedCount > 0) {
+      try {
+        await batch.commit();
+        console.log(`Cleaned up ${deletedCount} orphaned investments`);
+      } catch (commitError) {
+        console.error('Error committing batch delete:', commitError);
+        // If batch commit fails due to permissions, return the error
+        return { deletedCount: 0, error: commitError };
+      }
+    } else {
+      console.log('No orphaned investments found');
+    }
+    
+    return { deletedCount, error: null };
+  } catch (error) {
+    console.error('Error cleaning up orphaned investments:', error);
+    // If the initial query fails due to permissions, return the error
+    return { deletedCount: 0, error };
   }
 };
 

@@ -15,7 +15,22 @@ module.exports = async (req, res) => {
   try {
     const { investments, userProfile } = req.body;
 
+    console.log('=== PORTFOLIO API DEBUG ===');
+    console.log('Received investments:', investments);
+    console.log('Received userProfile:', userProfile);
+    console.log('investments length:', investments?.length);
+    console.log('userProfile exists:', !!userProfile);
+    console.log('userProfile keys:', userProfile ? Object.keys(userProfile) : 'null');
+    console.log('userProfile experience:', userProfile?.experience);
+    console.log('userProfile riskTolerance:', userProfile?.riskTolerance);
+    console.log('userProfile interests:', userProfile?.interests);
+    console.log('userProfile primaryGoal:', userProfile?.primaryGoal);
+
     if (!investments || !userProfile || investments.length === 0) {
+      console.log('Validation failed:');
+      console.log('- investments exists:', !!investments);
+      console.log('- userProfile exists:', !!userProfile);
+      console.log('- investments.length > 0:', investments?.length > 0);
       return res.status(400).json({ error: 'Missing or empty portfolio or missing profile data' });
     }
 

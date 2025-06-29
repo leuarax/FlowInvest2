@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPortfolioAnalysis, analyzeInvestment } from '../utils/openai';
 import { 
   Container, Box, Typography, Button, Grid, Paper, 
   CircularProgress, IconButton, Divider, Card, 
   CardContent, Modal, Fade, Backdrop, Tooltip,
-  LinearProgress, Chip, Avatar, TextField
+  LinearProgress, Chip, Avatar, TextField,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  MenuItem
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SpeedIcon from '@mui/icons-material/Speed';
@@ -16,16 +18,23 @@ import SecurityIcon from '@mui/icons-material/Security';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import HomeIcon from '@mui/icons-material/Home';
 import ChatIcon from '@mui/icons-material/Chat';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import WarningIcon from '@mui/icons-material/Warning';
 import FastAddPortfolio from './FastAddPortfolio';
 import Footer from './Footer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
+import AddRealEstate from './AddRealEstate';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import { interestOptions } from '../utils/constants';
 
 console.log('Dashboard rendered');
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, userProfile, getUserInvestments, saveInvestment, deleteInvestment: deleteInvestmentFromFirebase } = useAuth();
+  const { user, userProfile, getUserInvestments, saveInvestment, deleteInvestment: deleteInvestmentFromFirebase, updateUserProfile, deleteAccount } = useAuth();
   const [loading, setLoading] = useState(true);
   const [investments, setInvestments] = useState([]);
   const [stats, setStats] = useState({
@@ -43,10 +52,239 @@ const Dashboard = () => {
   const [stressTestLoading, setStressTestLoading] = useState(false);
   const [stressTestAnalysis, setStressTestAnalysis] = useState(null);
   const [stressTestError, setStressTestError] = useState('');
+  const [realEstateOpen, setRealEstateOpen] = useState(false);
+  const [portfolioAnalysisLoading, setPortfolioAnalysisLoading] = useState(false);
+  const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [editingPrefs, setEditingPrefs] = useState(false);
+  const [editName, setEditName] = useState(userProfile?.displayName || userProfile?.name || '');
+  const [editExperience, setEditExperience] = useState(userProfile?.experience || '');
+  const [editRisk, setEditRisk] = useState(userProfile?.riskTolerance || '');
+  const [editInterests, setEditInterests] = useState(userProfile?.interests || []);
+  const [editGoal, setEditGoal] = useState(userProfile?.primaryGoal || '');
+  const [prefsLoading, setPrefsLoading] = useState(false);
+  const [prefsError, setPrefsError] = useState('');
+  const [prefsSuccess, setPrefsSuccess] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState('');
+  const [nameSuccess, setNameSuccess] = useState('');
   
-  React.useEffect(() => {
-    console.log('Dashboard mounted');
-  }, []);
+  const showOnboardingProgress = useMemo(() => {
+    if (!userProfile) return false;
+    if (userProfile.onboardingCompleted) return false;
+    if (!userProfile.onboardingSteps) return true;
+    // Show if any step is not completed
+    return [1,2,3].some(id => !userProfile.onboardingSteps[id]);
+  }, [userProfile]);
+  
+  // Onboarding progress state
+
+  const loadInvestments = useCallback(async () => {
+    try {
+      console.log('loadInvestments called');
+      const { investments: firebaseInvestments, error } = await getUserInvestments();
+      console.log('Firebase investments loaded:', firebaseInvestments);
+      console.log('Firebase investments length:', firebaseInvestments?.length);
+      
+      if (error) {
+        console.error('Error loading investments:', error);
+        setError('Failed to load investments');
+        return;
+      }
+
+      console.log('Setting investments state to:', firebaseInvestments);
+      setInvestments(firebaseInvestments);
+
+      // Calculate stats
+      if (firebaseInvestments.length > 0) {
+        const total = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
+        // Calculate yearly ROI, including annualized cashflow for real estate
+        const avgROI = firebaseInvestments.reduce((acc, inv) => {
+          let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
+          if (inv.type === 'Real Estate') {
+            // Annualize ROI and add annualized cashflow as percent of amount
+            const amount = parseFloat(inv.amount) || 1;
+            const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
+              ? parseFloat(inv.cashflowAfterMortgage)
+              : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
+            const annualCashflow = netCashflow * 12;
+            const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
+            roi = roi * 12 + cashflowROI;
+          }
+          return acc + (isNaN(roi) ? 0 : roi);
+        }, 0) / firebaseInvestments.length;
+        const avgRisk = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / firebaseInvestments.length;
+
+        setStats({
+          totalPortfolio: total,
+          avgROI,
+          avgRisk,
+          investmentCount: firebaseInvestments.length,
+        });
+      }
+
+      // Onboarding updates are handled by separate useEffect
+    } catch (error) {
+      console.error('Error loading investments:', error);
+      setError('Failed to load investments');
+    }
+  }, [getUserInvestments]);
+
+  // Define handleGetPortfolioAnalysis before using it in useMemo
+  const handleGetPortfolioAnalysis = useCallback(async () => {
+    setPortfolioAnalysisLoading(true);
+    setError('');
+    setPortfolioAnalysis(null);
+    try {
+      console.log('Starting portfolio analysis with:', { 
+        userProfile: !!userProfile, 
+        investmentsCount: investments.length,
+        investments: investments,
+        userProfileData: userProfile
+      });
+      
+      if (!userProfile) {
+        throw new Error('User profile not found. Please complete onboarding first.');
+      }
+      
+      // Additional validation
+      if (!userProfile.experience || !userProfile.riskTolerance || !userProfile.interests || !userProfile.primaryGoal) {
+        throw new Error('User profile is incomplete. Please complete your profile first.');
+      }
+      
+      // Ensure investments are loaded before proceeding
+      let currentInvestments = investments;
+      if (investments.length === 0) {
+        console.log('Investments not loaded yet, loading them first...');
+        await loadInvestments();
+        // Get investments directly from the function since state updates are async
+        const { investments: freshInvestments } = await getUserInvestments();
+        currentInvestments = freshInvestments;
+        console.log('Investments loaded, count:', currentInvestments.length);
+      }
+      
+      console.log('About to call getPortfolioAnalysis with:', {
+        investmentsLength: currentInvestments.length,
+        investments: currentInvestments,
+        userProfile: userProfile
+      });
+      
+      // Debug: Check if userProfile has required fields
+      console.log('UserProfile validation:', {
+        hasUserProfile: !!userProfile,
+        experience: userProfile?.experience,
+        riskTolerance: userProfile?.riskTolerance,
+        interests: userProfile?.interests,
+        primaryGoal: userProfile?.primaryGoal,
+        fullUserProfile: userProfile
+      });
+      
+      // Debug: Check investments structure
+      console.log('Investments validation:', {
+        investmentsLength: currentInvestments.length,
+        investmentsType: typeof currentInvestments,
+        isArray: Array.isArray(currentInvestments),
+        firstInvestment: currentInvestments[0],
+        allInvestments: currentInvestments
+      });
+      
+      // Final debug before API call
+      console.log('=== FINAL DEBUG BEFORE API CALL ===');
+      console.log('investments:', currentInvestments);
+      console.log('userProfile:', userProfile);
+      console.log('investments.length:', currentInvestments.length);
+      console.log('userProfile exists:', !!userProfile);
+      console.log('userProfile type:', typeof userProfile);
+      console.log('userProfile keys:', userProfile ? Object.keys(userProfile) : 'null');
+      
+      const analysis = await getPortfolioAnalysis(currentInvestments, userProfile);
+      setPortfolioAnalysis(analysis);
+      
+      // Step 2 completion is handled by the useEffect that watches portfolioAnalysis
+    } catch (err) {
+      console.error('Portfolio analysis error:', err);
+      setError(err.message || 'An unknown error occurred.');
+    } finally {
+      setPortfolioAnalysisLoading(false);
+    }
+  }, [userProfile, investments, loadInvestments, getUserInvestments, setPortfolioAnalysisLoading, setError, setPortfolioAnalysis]);
+
+  const defaultOnboardingSteps = useMemo(() => [
+    { id: 1, title: 'Add Your First Investment', completed: false, action: () => setFastAddOpen(true) },
+    { id: 2, title: 'Get Portfolio Analysis', completed: false, action: () => handleGetPortfolioAnalysis() },
+    { id: 3, title: 'Explore Stress Testing', completed: false, action: () => setStressTestOpen(true) }
+  ], [setFastAddOpen, handleGetPortfolioAnalysis, setStressTestOpen]);
+
+  const [onboardingSteps, setOnboardingSteps] = useState(defaultOnboardingSteps);
+
+  // --- 1. Always sync onboarding steps with Firestore if available ---
+  useEffect(() => {
+    if (userProfile && userProfile.onboardingSteps) {
+      console.log('SYNC: userProfile.onboardingSteps:', userProfile.onboardingSteps);
+      setOnboardingSteps(prev =>
+        prev.map(step => ({
+          ...step,
+          completed: !!userProfile.onboardingSteps[String(step.id)]
+        }))
+      );
+    }
+  }, [userProfile]);
+
+  // --- 2. Helper to update a step in Firestore ---
+  const markStepCompletedInFirestore = useCallback(async (stepId) => {
+    if (!user || !user.uid) return;
+    const updatedSteps = {
+      ...(userProfile?.onboardingSteps || {}),
+      [stepId]: true
+    };
+    console.log(`ACTION: Marking step ${stepId} as complete in Firestore`, updatedSteps);
+    await updateUserProfile({ onboardingSteps: updatedSteps });
+  }, [user, userProfile, updateUserProfile]);
+
+  // --- 3. When a step is completed, only update Firestore ---
+  // Step 1: investments
+  useEffect(() => {
+    const alreadyCompleted = userProfile?.onboardingSteps && userProfile.onboardingSteps[1];
+    if (showOnboardingProgress && investments.length > 0 && !alreadyCompleted) {
+      console.log('EFFECT: Step 1 effect triggered, marking as complete');
+      markStepCompletedInFirestore(1);
+    }
+  }, [investments, showOnboardingProgress, markStepCompletedInFirestore, userProfile]);
+
+  // Step 2: portfolio analysis
+  useEffect(() => {
+    const alreadyCompleted = userProfile?.onboardingSteps && userProfile.onboardingSteps[2];
+    if (showOnboardingProgress && portfolioAnalysis && !alreadyCompleted) {
+      console.log('EFFECT: Step 2 effect triggered, marking as complete');
+      markStepCompletedInFirestore(2);
+    }
+  }, [portfolioAnalysis, showOnboardingProgress, markStepCompletedInFirestore, userProfile]);
+
+  // Step 3: stress test
+  useEffect(() => {
+    const alreadyCompleted = userProfile?.onboardingSteps && userProfile.onboardingSteps[3];
+    if (showOnboardingProgress && stressTestAnalysis && !alreadyCompleted) {
+      console.log('EFFECT: Step 3 effect triggered, marking as complete');
+      markStepCompletedInFirestore(3);
+    }
+  }, [stressTestAnalysis, showOnboardingProgress, markStepCompletedInFirestore, userProfile]);
+
+  // --- 4. When all steps are completed, set onboardingCompleted: true as before ---
+  useEffect(() => {
+    if (!showOnboardingProgress) return;
+    const allCompleted = onboardingSteps.every(step => step.completed);
+    if (allCompleted && !userProfile?.onboardingCompleted) {
+      updateUserProfile({ onboardingCompleted: true });
+      // Optionally, you could also clear onboardingSteps from Firestore here
+    }
+  }, [onboardingSteps, showOnboardingProgress, userProfile, updateUserProfile]);
+
+  // --- LOG onboardingSteps before rendering progress bar ---
+  useEffect(() => {
+    console.log('RENDER: onboardingSteps state:', onboardingSteps);
+  }, [onboardingSteps]);
 
   const getGradeColor = (grade) => {
     if (!grade) return '#64748b';
@@ -151,50 +389,6 @@ const Dashboard = () => {
     }
   };
 
-  const loadInvestments = useCallback(async () => {
-    try {
-      const { investments: firebaseInvestments, error } = await getUserInvestments();
-      if (error) {
-        console.error('Error loading investments:', error);
-        setError('Failed to load investments');
-        return;
-      }
-
-      setInvestments(firebaseInvestments);
-
-      // Calculate stats
-      if (firebaseInvestments.length > 0) {
-        const total = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-        // Calculate yearly ROI, including annualized cashflow for real estate
-        const avgROI = firebaseInvestments.reduce((acc, inv) => {
-          let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
-          if (inv.type === 'Real Estate') {
-            // Annualize ROI and add annualized cashflow as percent of amount
-            const amount = parseFloat(inv.amount) || 1;
-            const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
-              ? parseFloat(inv.cashflowAfterMortgage)
-              : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
-            const annualCashflow = netCashflow * 12;
-            const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
-            roi = roi * 12 + cashflowROI;
-          }
-          return acc + (isNaN(roi) ? 0 : roi);
-        }, 0) / firebaseInvestments.length;
-        const avgRisk = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / firebaseInvestments.length;
-
-        setStats({
-          totalPortfolio: total,
-          avgROI,
-          avgRisk,
-          investmentCount: firebaseInvestments.length,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading investments:', error);
-      setError('Failed to load investments');
-    }
-  }, [getUserInvestments]);
-
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -205,7 +399,7 @@ const Dashboard = () => {
     loadInvestments().finally(() => {
       setLoading(false);
     });
-  }, [user, userProfile, navigate, loadInvestments]);
+  }, [user, navigate, loadInvestments]);
 
   const handleOpenModal = (investment) => {
     setSelectedInvestment(investment);
@@ -213,23 +407,6 @@ const Dashboard = () => {
 
   const handleCloseModal = () => {
     setSelectedInvestment(null);
-  };
-
-  const handleGetPortfolioAnalysis = async () => {
-    setLoading(true);
-    setError('');
-    setPortfolioAnalysis(null);
-    try {
-      if (!userProfile) {
-        throw new Error('User profile not found. Please complete onboarding first.');
-      }
-      const analysis = await getPortfolioAnalysis(investments, userProfile);
-      setPortfolioAnalysis(analysis);
-    } catch (err) {
-      setError(err.message || 'An unknown error occurred.');
-    } finally {
-      setLoading(false);
-    }
   };
 
   const deleteInvestment = async (investment) => {
@@ -279,17 +456,23 @@ const Dashboard = () => {
   const handleOpenStressTest = () => setStressTestOpen(true);
   const handleCloseStressTest = () => {
     setStressTestOpen(false);
-    setStressTestAnalysis(null);
+    // Don't reset stressTestAnalysis to preserve step 3 completion
+    // setStressTestAnalysis(null);
     setStressTestError('');
     setStressTestInput('');
   };
 
   const handleSendStressTest = async () => {
-    if (!stressTestInput.trim()) return;
-    setStressTestLoading(true);
-    setStressTestError('');
-    setStressTestAnalysis(null);
+    if (!stressTestInput.trim()) {
+      setStressTestError('Please enter a scenario to test.');
+      return;
+    }
+
     try {
+      setStressTestLoading(true);
+      setStressTestError('');
+      setStressTestAnalysis(null);
+      
       let res, data;
       
       // Try local endpoint first
@@ -300,8 +483,23 @@ const Dashboard = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scenario: stressTestInput, investments, userProfile })
         });
-        data = await res.json();
+        
         console.log('Local response status:', res.status);
+        console.log('Local response headers:', res.headers);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const responseText = await res.text();
+        console.log('Local response text:', responseText.substring(0, 200));
+        
+        try {
+          data = JSON.parse(responseText);
+        } catch (parseError) {
+          throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+        }
+        
         console.log('Local response data:', data);
       } catch (err) {
         console.log('Local endpoint failed:', err.message);
@@ -318,12 +516,27 @@ const Dashboard = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ scenario: stressTestInput, investments, userProfile })
           });
-          data = await res.json();
+          
           console.log('Vercel response status:', res.status);
+          console.log('Vercel response headers:', res.headers);
+          
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+          
+          const responseText = await res.text();
+          console.log('Vercel response text:', responseText.substring(0, 200));
+          
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
+          }
+          
           console.log('Vercel response data:', data);
         } catch (err2) {
           console.log('Vercel endpoint failed:', err2.message);
-          data = { error: `Both endpoints failed. Local: ${err.message}, Vercel: ${err2.message}` };
+          throw new Error(`Both endpoints failed. Local: ${err.message}, Vercel: ${err2.message}`);
         }
       }
       
@@ -339,6 +552,11 @@ const Dashboard = () => {
             const parsedData = JSON.parse(jsonMatch[1]);
             setStressTestAnalysis(parsedData);
             setStressTestError('');
+            
+            // Update onboarding progress to mark step 3 as complete
+            // if (showOnboardingProgress) {
+            //   updateOnboardingProgress(investments);
+            // }
           } else {
             setStressTestError('Invalid response format.');
             setStressTestAnalysis(null);
@@ -351,6 +569,11 @@ const Dashboard = () => {
         // Direct JSON response
         setStressTestAnalysis(data);
         setStressTestError('');
+        
+        // Update onboarding progress to mark step 3 as complete
+        // if (showOnboardingProgress) {
+        //   updateOnboardingProgress(investments);
+        // }
       } else if (data.error) {
         setStressTestError(data.error);
         setStressTestAnalysis(null);
@@ -360,7 +583,7 @@ const Dashboard = () => {
       }
     } catch (e) {
       console.error('Unexpected error in stress test:', e);
-      setStressTestError('Error contacting AI.');
+      setStressTestError(`Error: ${e.message}`);
       setStressTestAnalysis(null);
     } finally {
       setStressTestLoading(false);
@@ -396,6 +619,22 @@ const Dashboard = () => {
       gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
       icon: <AssessmentIcon sx={{ fontSize: 28 }} />,
     },
+  ];
+
+  // --- LOG onboardingSteps before rendering progress bar ---
+  useEffect(() => {
+    console.log('RENDER: onboardingSteps state:', onboardingSteps);
+  }, [onboardingSteps]);
+
+  const experienceOptions = [
+    { value: 'beginner', label: 'Beginner' },
+    { value: 'intermediate', label: 'Intermediate' },
+    { value: 'advanced', label: 'Advanced' },
+  ];
+  const riskOptions = [
+    { value: 'conservative', label: 'Conservative' },
+    { value: 'moderate', label: 'Moderate' },
+    { value: 'aggressive', label: 'Aggressive' },
   ];
 
   return (
@@ -502,7 +741,7 @@ const Dashboard = () => {
               </Typography>
             </Box>
             
-            {/* Quick Actions */}
+            {/* Quick Actions - unified row for all screen sizes */}
             <Box sx={{ 
               display: 'flex', 
               gap: 2, 
@@ -529,7 +768,8 @@ const Dashboard = () => {
                       transform: 'translateY(-2px)',
                       boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
                     },
-                    transition: 'all 0.3s ease'
+                    transition: 'all 0.3s ease',
+                    width: { xs: '100%', sm: 'auto' }
                   }}
                 >
                   Fast Add Portfolio
@@ -538,7 +778,7 @@ const Dashboard = () => {
               
               <Button
                 variant="contained"
-                onClick={() => navigate('/add-real-estate')}
+                onClick={() => setRealEstateOpen(true)}
                 startIcon={<HomeIcon />}
                 sx={{
                   background: 'rgba(255,255,255,0.15)',
@@ -555,21 +795,214 @@ const Dashboard = () => {
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
                   },
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.3s ease',
+                  width: { xs: '100%', sm: 'auto' }
                 }}
               >
                 Add Real Estate
               </Button>
+
+              <Tooltip title="Account Settings">
+                <Button
+                  variant="outlined"
+                  onClick={() => setAccountSettingsOpen(true)}
+                  startIcon={<AccountCircleIcon />}
+                  sx={{
+                    display: { xs: 'none', sm: 'inline-flex' },
+                    background: 'rgba(255,255,255,0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    borderRadius: '16px',
+                    px: 3,
+                    py: 1.5,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    '&:hover': {
+                      background: 'rgba(255,255,255,0.2)',
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                    },
+                    transition: 'all 0.3s ease',
+                    width: { xs: '100%', sm: 'auto' }
+                  }}
+                >
+                  Your Account
+                </Button>
+              </Tooltip>
             </Box>
           </Box>
+
+          {/* Onboarding Progress Bar - Only show for new users */}
+          {showOnboardingProgress && (
+            <Box sx={{ 
+              mb: 4,
+              p: 3
+            }}>
+              <Typography variant="h6" sx={{ 
+                color: 'white', 
+                fontWeight: 600, 
+                mb: 3,
+                textAlign: 'center'
+              }}>
+                🚀 Welcome to FlowInvest! Let's get you started
+              </Typography>
+              
+              {/* Show error if there is one */}
+              {error && (
+                <Box sx={{ 
+                  mb: 3,
+                  p: 2,
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid rgba(239, 68, 68, 0.4)',
+                  borderRadius: '8px'
+                }}>
+                  <Typography variant="body2" sx={{ 
+                    color: 'white',
+                    fontWeight: 500
+                  }}>
+                    ⚠️ {error}
+                  </Typography>
+                </Box>
+              )}
+              
+              {/* Progress Bar: Steps packaged together */}
+              <Box sx={{
+                position: 'relative',
+                mb: 4,
+                px: 2,
+                pt: 1,
+                pb: 2
+              }}>
+                {/* Progress Line (behind dots) */}
+                <Box sx={{
+                  position: 'absolute',
+                  top: 28, // center of dot (dot is 40px, margin-bottom 16px)
+                  left: 'calc(80px)', // half step width
+                  right: 'calc(80px)', // half step width
+                  height: 3,
+                  background: 'rgba(255,255,255,0.2)',
+                  borderRadius: 2,
+                  zIndex: 1
+                }} />
+                {/* Completed Progress Line */}
+                <Box sx={{
+                  position: 'absolute',
+                  top: 28,
+                  left: 'calc(80px)',
+                  height: 3,
+                  background: 'linear-gradient(90deg, #10b981 0%, #34d399 100%)',
+                  borderRadius: 2,
+                  zIndex: 2,
+                  transition: 'width 0.5s ease',
+                  width: `calc(${(onboardingSteps.filter(step => step.completed).length - 1) / (onboardingSteps.length - 1) * 100}% * (100% - 160px))`
+                }} />
+                {/* Steps: dot + text packaged together */}
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  position: 'relative',
+                  zIndex: 3
+                }}>
+                  {onboardingSteps.map((step, index) => {
+                    const isPreviousStepCompleted = index === 0 || onboardingSteps[index - 1].completed;
+                    const isStepDisabled = !step.completed && !isPreviousStepCompleted;
+                    return (
+                      <Box key={step.id} sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        width: 160,
+                        minWidth: 0
+                      }}>
+                        {/* Dot */}
+                        <Box
+                          onClick={!step.completed && isPreviousStepCompleted ? step.action : undefined}
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '50%',
+                            background: step.completed 
+                              ? 'linear-gradient(135deg, #10b981 0%, #34d399 100%)'
+                              : isStepDisabled
+                              ? 'rgba(255,255,255,0.2)'
+                              : 'rgba(255,255,255,0.3)',
+                            border: step.completed 
+                              ? '3px solid #10b981'
+                              : isStepDisabled
+                              ? '3px solid rgba(255,255,255,0.1)'
+                              : '3px solid rgba(255,255,255,0.2)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            boxShadow: step.completed 
+                              ? '0 4px 12px rgba(16, 185, 129, 0.3)'
+                              : 'none',
+                            fontWeight: 'bold',
+                            fontSize: '18px',
+                            color: 'white',
+                            mb: 2,
+                            cursor: step.completed || isStepDisabled ? 'default' : 'pointer',
+                            transition: 'all 0.3s ease',
+                            '&:hover': !step.completed && !isStepDisabled ? {
+                              transform: 'scale(1.08)'
+                            } : {},
+                            position: 'relative',
+                            '&::before': step.completed ? {
+                              content: '"✓"',
+                              color: 'white',
+                              fontSize: '18px',
+                              fontWeight: 'bold'
+                            } : {
+                              content: `"${step.id}"`,
+                              color: 'white',
+                              fontSize: '14px',
+                              fontWeight: 'bold'
+                            }
+                          }}
+                        />
+                        {/* Step Title */}
+                        <Typography variant="body2" sx={{ 
+                          color: 'white',
+                          fontWeight: 500,
+                          textAlign: 'center',
+                          textDecoration: step.completed ? 'line-through' : 'none',
+                          opacity: step.completed ? 0.7 : isStepDisabled ? 0.5 : 1,
+                          fontSize: '1rem',
+                          lineHeight: 1.3,
+                          mb: 0.5
+                        }}>
+                          {step.title}
+                        </Typography>
+                        {/* Step Description */}
+                        {!step.completed && (
+                          <Typography variant="caption" sx={{ 
+                            color: isStepDisabled ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.7)',
+                            textAlign: 'center',
+                            mt: 0.5,
+                            fontSize: '0.85rem',
+                            lineHeight: 1.2,
+                            wordBreak: 'break-word'
+                          }}>
+                            {isStepDisabled ? 'Complete previous step first' : 'Click to get started'}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+            </Box>
+          )}
 
           {/* Action Buttons */}
           <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' }, flexWrap: 'wrap', mb: 2 }}>
             <Button 
               variant="outlined" 
               onClick={handleGetPortfolioAnalysis} 
-              disabled={investments.length === 0}
-              startIcon={<AnalyticsIcon />}
+              disabled={investments.length === 0 || portfolioAnalysisLoading}
+              startIcon={portfolioAnalysisLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <AnalyticsIcon />}
               sx={{
                 background: 'rgba(255,255,255,0.1)',
                 backdropFilter: 'blur(10px)',
@@ -593,12 +1026,13 @@ const Dashboard = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              Analyze Portfolio
+              {portfolioAnalysisLoading ? 'Analyzing Portfolio...' : 'Analyze Portfolio'}
             </Button>
             <Button
               variant="contained"
               color="secondary"
               onClick={handleOpenStressTest}
+              disabled={!portfolioAnalysis && !(userProfile?.onboardingSteps && userProfile.onboardingSteps[2])}
               startIcon={<ChatIcon />}
               sx={{
                 borderRadius: '12px',
@@ -612,6 +1046,12 @@ const Dashboard = () => {
                 '&:hover': {
                   background: 'linear-gradient(135deg, #f5576c 0%, #f093fb 100%)',
                   transform: 'translateY(-1px)'
+                },
+                '&:disabled': {
+                  background: 'rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.5)',
+                  boxShadow: 'none',
+                  transform: 'none'
                 },
                 transition: 'all 0.3s ease'
               }}
@@ -649,6 +1089,16 @@ const Dashboard = () => {
           onClose={() => setFastAddOpen(false)}
           onAddInvestments={handleAddInvestments}
         />
+
+        {/* Add Real Estate Modal */}
+        {realEstateOpen && (
+          <AddRealEstate 
+            onInvestmentAdded={(investments) => {
+              // Removed updateOnboardingProgress call
+              setRealEstateOpen(false);
+            }}
+          />
+        )}
 
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 6 }}>
@@ -1460,14 +1910,6 @@ const Dashboard = () => {
                       placeholder="Describe a scenario..."
                       value={stressTestInput}
                       onChange={e => setStressTestInput(e.target.value)}
-                      onKeyDown={e => { 
-                        // On mobile, Enter should create new lines, not submit
-                        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        if (e.key === 'Enter' && !e.shiftKey && !isMobile) { 
-                          e.preventDefault(); 
-                          handleSendStressTest(); 
-                        }
-                      }}
                       disabled={stressTestLoading}
                       sx={{
                         background: 'rgba(248,250,252,0.8)',
@@ -1809,8 +2251,487 @@ const Dashboard = () => {
           </Paper>
         )}
       </Container>
+
+      {/* Account Settings Modal */}
+      <Dialog 
+        open={accountSettingsOpen} 
+        onClose={() => setAccountSettingsOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          borderRadius: '24px 24px 0 0',
+          pb: 3
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <AccountCircleIcon sx={{ fontSize: 32 }} />
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              Account Settings
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          <Grid container spacing={3}>
+            {/* Account Information */}
+            <Grid item xs={12} md={6}>
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+                Account Information
+              </Typography>
+              
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
+                  Email Address
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                  {user?.email || 'Not available'}
+                </Typography>
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
+                  Password
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                  ••••••••••••••••
+                </Typography>
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
+                  Display Name
+                </Typography>
+                {editingName ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TextField
+                      size="small"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      disabled={nameLoading}
+                      error={!!nameError}
+                      helperText={nameError}
+                      sx={{ minWidth: 180 }}
+                    />
+                    <IconButton
+                      color="primary"
+                      onClick={async () => {
+                        setNameLoading(true);
+                        setNameError('');
+                        setNameSuccess('');
+                        if (!editName.trim()) {
+                          setNameError('Name cannot be empty');
+                          setNameLoading(false);
+                          return;
+                        }
+                        const { error } = await updateUserProfile({ displayName: editName });
+                        if (error) {
+                          setNameError(error.message || 'Failed to update name');
+                        } else {
+                          setNameSuccess('Name updated!');
+                          setEditingName(false);
+                        }
+                        setNameLoading(false);
+                      }}
+                      disabled={nameLoading}
+                    >
+                      <CheckIcon />
+                    </IconButton>
+                    <IconButton
+                      color="error"
+                      onClick={() => {
+                        setEditingName(false);
+                        setEditName(userProfile?.displayName || userProfile?.name || '');
+                        setNameError('');
+                      }}
+                      disabled={nameLoading}
+                    >
+                      <CloseIcon />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                      {userProfile?.displayName || userProfile?.name || 'Not set'}
+                    </Typography>
+                    <IconButton size="small" onClick={() => { setEditingName(true); setNameSuccess(''); }}>
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                )}
+                {nameSuccess && (
+                  <Typography variant="body2" sx={{ color: '#10b981', mt: 1 }}>{nameSuccess}</Typography>
+                )}
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>
+                  Account Created
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>
+                  {userProfile?.createdAt ? new Date(userProfile.createdAt.toDate()).toLocaleDateString() : 'Not available'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            {/* Investment Preferences */}
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 3, flex: 1 }}>
+                  Investment Preferences
+                </Typography>
+                {!editingPrefs && (
+                  <IconButton size="small" onClick={() => {
+                    setEditingPrefs(true);
+                    setPrefsSuccess('');
+                    setPrefsError('');
+                  }}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Box>
+              {editingPrefs ? (
+                <Box component="form" sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <TextField
+                    select
+                    label="Experience Level"
+                    value={editExperience}
+                    onChange={e => setEditExperience(e.target.value)}
+                    fullWidth
+                  >
+                    {experienceOptions.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    select
+                    label="Risk Tolerance"
+                    value={editRisk}
+                    onChange={e => setEditRisk(e.target.value)}
+                    fullWidth
+                  >
+                    {riskOptions.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    select
+                    label="Investment Interests"
+                    value={editInterests}
+                    onChange={e => setEditInterests(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                    SelectProps={{ multiple: true }}
+                    fullWidth
+                  >
+                    {interestOptions.map(opt => (
+                      <MenuItem key={opt} value={opt}>{opt}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    label="Primary Goal"
+                    value={editGoal}
+                    onChange={e => setEditGoal(e.target.value)}
+                    fullWidth
+                    multiline
+                    minRows={2}
+                  />
+                  {prefsError && <Typography color="error">{prefsError}</Typography>}
+                  {prefsSuccess && <Typography color="success.main">{prefsSuccess}</Typography>}
+                  <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+                    <Button
+                      variant="contained"
+                      onClick={async () => {
+                        setPrefsLoading(true);
+                        setPrefsError('');
+                        setPrefsSuccess('');
+                        try {
+                          const { error } = await updateUserProfile({
+                            experience: editExperience,
+                            riskTolerance: editRisk,
+                            interests: editInterests,
+                            primaryGoal: editGoal
+                          });
+                          if (error) {
+                            setPrefsError(error.message || 'Failed to update preferences');
+                          } else {
+                            setPrefsSuccess('Preferences updated!');
+                            setEditingPrefs(false);
+                          }
+                        } catch (err) {
+                          setPrefsError('Failed to update preferences');
+                        }
+                        setPrefsLoading(false);
+                      }}
+                      disabled={prefsLoading}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      onClick={() => {
+                        setEditingPrefs(false);
+                        setEditExperience(userProfile?.experience || '');
+                        setEditRisk(userProfile?.riskTolerance || '');
+                        setEditInterests(userProfile?.interests || []);
+                        setEditGoal(userProfile?.primaryGoal || '');
+                        setPrefsError('');
+                        setPrefsSuccess('');
+                      }}
+                      disabled={prefsLoading}
+                    >
+                      Cancel
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>Experience Level</Typography>
+                    <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>{userProfile?.experience || 'Not set'}</Typography>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>Risk Tolerance</Typography>
+                    <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>{userProfile?.riskTolerance || 'Not set'}</Typography>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>Investment Interests</Typography>
+                    <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>{userProfile?.interests ? userProfile.interests.join(', ') : 'Not set'}</Typography>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600, mb: 1 }}>Primary Goal</Typography>
+                    <Typography variant="body1" sx={{ color: '#1e293b', fontWeight: 500 }}>{userProfile?.primaryGoal || 'Not set'}</Typography>
+                  </Box>
+                </>
+              )}
+            </Grid>
+          </Grid>
+
+          <Divider sx={{ my: 4 }} />
+
+          {/* Danger Zone */}
+          <Box sx={{ 
+            p: 3, 
+            background: 'rgba(239, 68, 68, 0.05)', 
+            borderRadius: '12px',
+            border: '1px solid rgba(239, 68, 68, 0.2)'
+          }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#dc2626', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <WarningIcon sx={{ fontSize: 24 }} />
+              Danger Zone
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+              Once you delete your account, there is no going back. Please be certain.
+            </Typography>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setDeleteAccountOpen(true)}
+              startIcon={<DeleteIcon />}
+              sx={{
+                borderColor: '#ef4444',
+                color: '#ef4444',
+                '&:hover': {
+                  borderColor: '#dc2626',
+                  backgroundColor: 'rgba(239, 68, 68, 0.04)'
+                }
+              }}
+            >
+              Delete Account
+            </Button>
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => setAccountSettingsOpen(false)}
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderRadius: '12px',
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'
+              }
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Account Confirmation Dialog */}
+      <Dialog 
+        open={deleteAccountOpen} 
+        onClose={() => setDeleteAccountOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+          color: 'white',
+          borderRadius: '24px 24px 0 0',
+          pb: 3
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <WarningIcon sx={{ fontSize: 32 }} />
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              Delete Account
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
+            Are you absolutely sure?
+          </Typography>
+          <Typography variant="body1" sx={{ color: '#64748b', mb: 3 }}>
+            This action cannot be undone. This will permanently delete your account and remove all your data from our servers.
+          </Typography>
+          <Box sx={{ 
+            p: 3, 
+            background: 'rgba(239, 68, 68, 0.1)', 
+            borderRadius: '12px',
+            border: '1px solid rgba(239, 68, 68, 0.3)'
+          }}>
+            <Typography variant="body2" sx={{ color: '#dc2626', fontWeight: 600 }}>
+              ⚠️ This will delete:
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b', mt: 1 }}>
+              • Your account and profile
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              • All your investments and portfolio data
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              • All your analysis and recommendations
+            </Typography>
+          </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => setDeleteAccountOpen(false)}
+            variant="outlined"
+            sx={{
+              borderColor: '#64748b',
+              color: '#64748b',
+              borderRadius: '12px',
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': {
+                borderColor: '#475569',
+                backgroundColor: 'rgba(100, 116, 139, 0.04)'
+              }
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={async () => {
+              setDeleteAccountLoading(true);
+              try {
+                const { error } = await deleteAccount();
+                if (error) {
+                  console.error('Error deleting account:', error);
+                  // You might want to show an error message here
+                } else {
+                  // Account deleted successfully, user will be redirected to login
+                  navigate('/');
+                }
+              } catch (error) {
+                console.error('Unexpected error deleting account:', error);
+              } finally {
+                setDeleteAccountLoading(false);
+                setDeleteAccountOpen(false);
+              }
+            }}
+            variant="contained"
+            color="error"
+            disabled={deleteAccountLoading}
+            startIcon={deleteAccountLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
+            sx={{
+              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+              borderRadius: '12px',
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)'
+              },
+              '&:disabled': {
+                background: '#e2e8f0',
+                color: '#94a3b8'
+              }
+            }}
+          >
+            {deleteAccountLoading ? 'Deleting...' : 'Delete Account'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       <Footer />
+
+      {/* Mobile Top-Right Account Button */}
+      {!accountSettingsOpen && (
+        <Box
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            zIndex: 9999
+          }}
+        >
+          <Tooltip title="Account Settings">
+            <Button
+              variant="outlined"
+              onClick={() => setAccountSettingsOpen(true)}
+              sx={{
+                background: 'rgba(255,255,255,0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                color: 'white',
+                borderRadius: '50%',
+                minWidth: '48px',
+                width: '48px',
+                height: '48px',
+                p: 0,
+                boxShadow: 3,
+                '&:hover': {
+                  background: 'rgba(255,255,255,0.2)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <AccountCircleIcon />
+            </Button>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 };

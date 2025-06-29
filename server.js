@@ -8,6 +8,7 @@ const portfolioHandler = require('./api/portfolio.js');
 const analyzeScreenshotHandler = require('./api/analyze-screenshot.js');
 const batchScreenshotHandler = require('./api/batch-screenshot.js');
 const analyzeRealEstateHandler = require('./api/analyze-real-estate.js');
+const stressTestHandler = require('./api/stress-test.js');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -39,6 +40,11 @@ app.post('/api/analyze-screenshot', (req, res, next) => {
 // Real estate analysis endpoint
 app.post('/api/analyze-real-estate', (req, res, next) => {
   analyzeRealEstateHandler(req, res).catch(next);
+});
+
+// Stress test endpoint
+app.post('/api/stress-test', (req, res, next) => {
+  stressTestHandler(req, res).catch(next);
 });
 
 // Batch portfolio analysis endpoint

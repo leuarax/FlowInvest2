@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Container, Box, Typography, TextField, Button, 
   Grid, Paper, CircularProgress, Alert, LinearProgress,
@@ -7,12 +6,10 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
-import SaveIcon from '@mui/icons-material/Save';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import Footer from './Footer';
-import { useAuth } from '../contexts/AuthContext';
 
 // Utility function to determine color based on grade
 const getGradeColor = (grade) => {
@@ -27,8 +24,6 @@ const getGradeColor = (grade) => {
 };
 
 const InvestmentForm = () => {
-  const { user, saveInvestment } = useAuth();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [analysis, setAnalysis] = useState(null);
@@ -106,38 +101,6 @@ const InvestmentForm = () => {
     if (selectedFile) {
       setFile(selectedFile);
       setFilePreview(URL.createObjectURL(selectedFile));
-    }
-  };
-
-  const handleSaveInvestment = async () => {
-    if (!user) {
-      setError('You must be logged in to save investments');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const investmentData = {
-        // ...collect form data here...
-      };
-      
-      const { id, error } = await saveInvestment(investmentData);
-      
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      if (id) {
-        navigate('/dashboard');
-      }
-    } catch (error) {
-      setError('An unexpected error occurred. Please try again.');
-      console.error('Save investment error:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -638,29 +601,6 @@ const InvestmentForm = () => {
                         )}
                       </CardContent>
                     </Card>
-                    
-                    {/* Save Button */}
-                    <Button
-                      variant="contained"
-                      onClick={handleSaveInvestment}
-                      startIcon={<SaveIcon />}
-                      fullWidth
-                      sx={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '16px',
-                        py: 2,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        fontSize: '1.1rem',
-                        '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 12px 30px rgba(16, 185, 129, 0.4)'
-                        },
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      Save Investment to Portfolio
-                    </Button>
                   </Box>
                 </Fade>
               ) : (

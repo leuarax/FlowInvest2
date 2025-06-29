@@ -12,16 +12,19 @@ import InvestmentForm from './components/InvestmentForm';
 import AddRealEstate from './components/AddRealEstate';
 import Imprint from './components/Imprint';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import FinancialDisclaimer from './components/FinancialDisclaimer';
 import Login from './components/Login';
 import Registration from './components/Registration';
+import EmailVerification from './components/EmailVerification';
+import ForgotPassword from './components/ForgotPassword';
 
 // Context
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
-  console.log('ProtectedRoute', { loading, user });
+  const { user, emailVerified, loading } = useAuth();
+  console.log('ProtectedRoute', { loading, user, emailVerified });
   
   if (loading) {
     return (
@@ -48,6 +51,11 @@ const ProtectedRoute = ({ children }) => {
   
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // If user is authenticated but email is not verified, redirect to email verification
+  if (!emailVerified) {
+    return <Navigate to="/verify-email" replace />;
   }
   
   console.log('Matched /dashboard route (inside ProtectedRoute)');
@@ -85,6 +93,46 @@ const PublicRoute = ({ children }) => {
   // Only redirect to dashboard if user has both auth and profile
   if (user && userProfile) {
     console.log('User authenticated with profile, redirecting to dashboard');
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  return children;
+};
+
+// Email Verification Route Component
+const EmailVerificationRoute = ({ children }) => {
+  const { user, emailVerified, loading } = useAuth();
+  console.log('EmailVerificationRoute', { loading, user, emailVerified });
+  
+  if (loading) {
+    return (
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <CircularProgress 
+          size={80}
+          thickness={4}
+          sx={{
+            color: 'white',
+            '& .MuiCircularProgress-circle': {
+              strokeLinecap: 'round',
+            }
+          }}
+        />
+      </Box>
+    );
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // If email is already verified, redirect to dashboard
+  if (emailVerified) {
     return <Navigate to="/dashboard" replace />;
   }
   
@@ -192,8 +240,19 @@ function AppRoutes() {
           <AddRealEstate />
         </ProtectedRoute>
       } />
+      <Route path="/verify-email" element={
+        <EmailVerificationRoute>
+          <EmailVerification />
+        </EmailVerificationRoute>
+      } />
       <Route path="/imprint" element={<Imprint />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/financial-disclaimer" element={<FinancialDisclaimer />} />
+      <Route path="/forgot-password" element={
+        <PublicRoute>
+          <ForgotPassword />
+        </PublicRoute>
+      } />
     </Routes>
   );
 }

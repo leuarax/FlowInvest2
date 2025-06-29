@@ -16,9 +16,11 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PersonIcon from '@mui/icons-material/Person';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+
+// Global variable to persist registration error across component re-mounts
+let globalRegistrationError = '';
 
 const Registration = () => {
   const { signUp } = useAuth();
@@ -27,7 +29,6 @@ const Registration = () => {
     email: '',
     password: '',
     confirmPassword: '',
-    displayName: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -59,15 +60,12 @@ const Registration = () => {
     // Clear auth error when user starts typing
     if (error) {
       setError('');
+      globalRegistrationError = '';
     }
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (!formData.displayName) {
-      newErrors.displayName = 'Full name is required';
-    }
     
     if (!formData.email) {
       newErrors.email = 'Email is required';
@@ -102,6 +100,7 @@ const Registration = () => {
 
     setLoading(true);
     setError('');
+    globalRegistrationError = '';
 
     try {
       console.log('Starting registration process...');
@@ -112,10 +111,13 @@ const Registration = () => {
       
       console.log('Onboarding data:', parsedOnboardingData);
 
+      // Use email as display name if no name is provided in onboarding data
+      const displayName = parsedOnboardingData?.displayName || parsedOnboardingData?.name || formData.email.split('@')[0];
+
       const { user, error } = await signUp(
         formData.email, 
         formData.password, 
-        formData.displayName,
+        displayName,
         parsedOnboardingData
       );
       
@@ -123,15 +125,22 @@ const Registration = () => {
         console.error('Registration error:', error);
         
         // Handle specific Firebase errors
+        let errorMessage = '';
         if (error.code === 'auth/email-already-in-use') {
-          setError('This email is already registered. Please try logging in instead.');
+          errorMessage = 'This email is already registered. Please try logging in instead.';
         } else if (error.code === 'auth/weak-password') {
-          setError('Password is too weak. Please choose a stronger password.');
+          errorMessage = 'Password is too weak. Please choose a stronger password.';
         } else if (error.code === 'auth/invalid-email') {
-          setError('Please enter a valid email address.');
+          errorMessage = 'Please enter a valid email address.';
+        } else if (error.code === 'auth/operation-not-allowed') {
+          errorMessage = 'Email/password accounts are not enabled. Please contact support.';
         } else {
-          setError(error.message || 'Registration failed. Please try again.');
+          errorMessage = error.message || 'Registration failed. Please try again.';
         }
+        
+        // Set error in global variable and state
+        globalRegistrationError = errorMessage;
+        setError(errorMessage);
         return;
       }
 
@@ -139,11 +148,14 @@ const Registration = () => {
         console.log('Registration successful, user created:', user);
         // Clear onboarding data from localStorage
         localStorage.removeItem('onboardingData');
-        navigate('/dashboard');
+        globalRegistrationError = '';
+        navigate('/verify-email');
       }
     } catch (error) {
       console.error('Unexpected registration error:', error);
-      setError('An unexpected error occurred. Please try again.');
+      const errorMessage = 'An unexpected error occurred. Please try again.';
+      globalRegistrationError = errorMessage;
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -221,7 +233,7 @@ const Registration = () => {
             </Alert>
 
             {/* Error Alert */}
-            {error && (
+            {globalRegistrationError && (
               <Alert 
                 severity="error" 
                 sx={{ 
@@ -232,43 +244,12 @@ const Registration = () => {
                   color: '#b91c1c'
                 }}
               >
-                {error}
+                {globalRegistrationError}
               </Alert>
             )}
 
             {/* Registration Form */}
             <Box component="form" onSubmit={handleSubmit} sx={{ mb: 3 }}>
-              <TextField
-                fullWidth
-                name="displayName"
-                label="Full Name"
-                value={formData.displayName}
-                onChange={handleInputChange}
-                error={!!errors.displayName}
-                helperText={errors.displayName}
-                variant="outlined"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonIcon sx={{ color: '#667eea' }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  mb: 3,
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '12px',
-                    background: 'rgba(248, 250, 252, 0.8)',
-                    '&:hover fieldset': {
-                      borderColor: '#667eea'
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: '#667eea'
-                    }
-                  }
-                }}
-              />
-
               <TextField
                 fullWidth
                 name="email"

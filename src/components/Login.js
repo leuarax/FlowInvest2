@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Button,
@@ -19,6 +19,9 @@ import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
+// Global variable to persist error across component re-mounts
+let globalLoginError = '';
+
 const Login = () => {
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -29,59 +32,117 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [authError, setAuthError] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [showError, setShowError] = useState(false);
+  const prevFormDataRef = useRef({ email: '', password: '' });
+  const errorRef = useRef('');
 
-  console.log('Login rendered');
+  console.log('Login component rendered, loginError:', loginError, 'showError:', showError, 'errorRef.current:', errorRef.current, 'globalLoginError:', globalLoginError);
+
+  // Debug effect to track error state changes
+  React.useEffect(() => {
+    console.log('Error state changed - loginError:', loginError, 'showError:', showError);
+    if (loginError && !showError) {
+      console.log('WARNING: loginError is set but showError is false!');
+    }
+    if (!loginError && showError) {
+      console.log('WARNING: showError is true but loginError is empty!');
+    }
+  }, [loginError, showError]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    const prevValue = prevFormDataRef.current[name];
+    console.log('handleInputChange called for:', name, 'with value:', value, 'previous value:', prevValue);
+    
+    // Update the ref with current values
+    prevFormDataRef.current = { ...prevFormDataRef.current, [name]: value };
+    
     setFormData({
       ...formData,
       [name]: value,
     });
-    // Clear error when user starts typing
+    // Clear field-specific errors when user starts typing
     if (errors[name]) {
       setErrors({
         ...errors,
         [name]: '',
       });
     }
-    // Clear auth error when user starts typing
-    if (authError) {
-      setAuthError('');
+    // Only clear login error if user actually changed the input (not during re-renders)
+    if (loginError && value !== prevValue) {
+      console.log('Clearing loginError due to user input');
+      setLoginError('');
+      setShowError(false);
+      errorRef.current = '';
+      globalLoginError = '';
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setAuthError('');
+    // Don't clear error at the start - let it persist until we know the result
 
     try {
       console.log('Attempting to sign in with email:', formData.email);
-      const { user, error } = await signIn(formData.email, formData.password);
+      const result = await signIn(formData.email, formData.password);
+      console.log('SignIn result:', result);
+      
+      const { user, error } = result;
       
       if (error) {
         console.error('Login error:', error);
-        setAuthError(error.message);
+        let errorMsg = 'Invalid email or password. Please check your credentials and try again.';
+        
+        // Handle specific error messages
+        if (error.message && error.message.includes('verify your email')) {
+          errorMsg = error.message;
+        } else if (error.code === 'auth/user-not-found') {
+          errorMsg = 'No account found with this email address. Please check your email or create a new account.';
+        } else if (error.code === 'auth/wrong-password') {
+          errorMsg = 'Incorrect password. Please try again.';
+        } else if (error.code === 'auth/too-many-requests') {
+          errorMsg = 'Too many failed login attempts. Please try again later.';
+        }
+        
+        console.log('Setting loginError to:', errorMsg);
+        
+        // Set error in global variable, ref and state
+        globalLoginError = errorMsg;
+        errorRef.current = errorMsg;
+        setLoginError(errorMsg);
+        console.log('About to set showError to true');
+        setShowError(true);
+        console.log('setShowError(true) called');
+        
+        console.log('setLoginError called');
         return;
       }
 
       if (user) {
         console.log('Login successful, user:', user);
+        // Clear error on successful login
+        setLoginError('');
+        setShowError(false);
+        errorRef.current = '';
+        globalLoginError = '';
         navigate('/dashboard');
       }
     } catch (error) {
       console.error('Unexpected login error:', error);
-      setAuthError('An unexpected error occurred. Please try again.');
+      const errorMsg = 'Invalid email or password. Please check your credentials and try again.';
+      globalLoginError = errorMsg;
+      errorRef.current = errorMsg;
+      setLoginError(errorMsg);
+      setShowError(true);
     } finally {
       setLoading(false);
     }
   };
 
   const handleForgotPassword = () => {
-    // Handle forgot password logic
-    console.log('Forgot password clicked');
+    navigate('/forgot-password');
   };
 
   return (
@@ -261,10 +322,10 @@ const Login = () => {
               </Button>
             </Box>
 
-            {/* Auth Error Alert */}
-            {authError && (
+            {/* Login Error Alert */}
+            {globalLoginError && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                {authError}
+                {globalLoginError}
               </Alert>
             )}
           </Paper>

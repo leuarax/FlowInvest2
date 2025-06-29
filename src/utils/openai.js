@@ -73,6 +73,16 @@ export const getInvestmentAnalysis = async (investmentData, userProfile) => {
 
 export const getPortfolioAnalysis = async (investments, userProfile) => {
   try {
+    console.log('=== PORTFOLIO ANALYSIS DEBUG ===');
+    console.log('Input investments:', investments);
+    console.log('Input userProfile:', userProfile);
+    console.log('Investments length:', investments?.length);
+    console.log('UserProfile exists:', !!userProfile);
+    console.log('UserProfile keys:', userProfile ? Object.keys(userProfile) : 'null');
+    
+    const requestBody = { investments, userProfile };
+    console.log('Request body being sent:', requestBody);
+    
     console.log('Sending portfolio analysis request:', { investments, userProfile });
     
     const response = await fetch(getApiPath('/portfolio'), {
@@ -81,7 +91,7 @@ export const getPortfolioAnalysis = async (investments, userProfile) => {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({ investments, userProfile }),
+      body: JSON.stringify(requestBody),
     });
 
     console.log('Portfolio analysis response status:', response.status);

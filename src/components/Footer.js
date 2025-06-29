@@ -75,6 +75,25 @@ const Footer = () => {
           >
             Privacy Policy
           </Link>
+          
+          <Link
+            component={RouterLink}
+            to="/financial-disclaimer"
+            sx={{
+              color: 'rgba(255,255,255,0.8)',
+              textDecoration: 'none',
+              fontSize: '0.875rem',
+              fontFamily: '"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
+              fontWeight: 400,
+              '&:hover': {
+                color: 'white',
+                textDecoration: 'underline'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Financial Disclaimer
+          </Link>
         </Box>
       </Container>
     </Box>
