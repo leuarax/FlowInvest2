@@ -8,6 +8,7 @@ import { Box, CircularProgress } from '@mui/material';
 import LandingPage from './components/LandingPage';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
+import Portfolio from './components/Portfolio';
 import InvestmentForm from './components/InvestmentForm';
 import AddRealEstate from './components/AddRealEstate';
 import Imprint from './components/Imprint';
@@ -228,6 +229,11 @@ function AppRoutes() {
       <Route path="/dashboard" element={
         <ProtectedRoute>
           <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/portfolio" element={
+        <ProtectedRoute>
+          <Portfolio />
         </ProtectedRoute>
       } />
       <Route path="/add-investment" element={

@@ -333,6 +333,66 @@ export const cleanupOrphanedInvestments = async () => {
   }
 };
 
+// Portfolio analysis and grade history functions
+export const savePortfolioAnalysis = async (userId, analysis) => {
+  try {
+    const docRef = doc(db, 'portfolio_analysis', userId);
+    // Fetch existing grade history
+    const docSnap = await getDoc(docRef);
+    let gradeHistory = [];
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      gradeHistory = Array.isArray(data.gradeHistory) ? data.gradeHistory : [];
+    }
+    // Add new grade to history (limit to 30 days)
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10); // YYYY-MM-DD
+    // Remove any entry for today
+    gradeHistory = gradeHistory.filter(entry => entry.date !== todayStr);
+    // Add new entry
+    gradeHistory.push({ date: todayStr, grade: analysis.grade });
+    // Keep only last 30 days
+    gradeHistory = gradeHistory.slice(-30);
+    // Save analysis and history
+    await setDoc(docRef, {
+      ...analysis,
+      gradeHistory,
+      updatedAt: today
+    });
+    return { error: null };
+  } catch (error) {
+    console.error('Error saving portfolio analysis:', error);
+    return { error };
+  }
+};
+
+export const getPortfolioAnalysisAndHistory = async (userId) => {
+  try {
+    const docRef = doc(db, 'portfolio_analysis', userId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { analysis: docSnap.data(), error: null };
+    } else {
+      return { analysis: null, error: null };
+    }
+  } catch (error) {
+    console.error('Error fetching portfolio analysis:', error);
+    return { analysis: null, error };
+  }
+};
+
+// Add this function to delete a user's portfolio analysis
+export const deletePortfolioAnalysis = async (userId) => {
+  try {
+    await deleteDoc(doc(db, 'portfolio_analysis', userId));
+    console.log('Portfolio analysis deleted for user:', userId);
+    return { error: null };
+  } catch (error) {
+    console.error('Error deleting portfolio analysis:', error);
+    return { error };
+  }
+};
+
 // Auth state listener
 export const onAuthStateChange = (callback) => {
   return onAuthStateChanged(auth, callback);

@@ -41,17 +41,8 @@ async function analyzeScreenshot(req, res) {
     const base64Image = imageBuffer.toString('base64');
 
     // Prepare the prompt
-    const prompt = `You are a senior financial analyst. Analyze the investment screenshot and the user's notes to identify the single most prominent investment. Return a single, valid JSON object. Do NOT wrap it in markdown. The JSON object MUST have these exact fields and data types: "name" (string), "type" (string), "amount" (number, e.g., 126.50), "duration" (string, one of: "Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"), "grade" (string, one of: "A", "B", "C", "D", "F"), "riskScore" (number, an integer from 1 to 10), "roiEstimate" (number, e.g., 15.5), and "explanation" (string). 
-
-For the explanation, provide a detailed analysis with the following structure:
-1. Overview of the investment
-2. Key financial metrics and performance indicators
-3. Risk assessment and factors affecting risk
-4. Market context and competitive position
-5. Future outlook and potential
-6. How this investment aligns with the user's profile and notes
-
-Make the explanation comprehensive, professional, and insightful, similar to what a professional financial advisor would provide. The user's notes are: "${additionalNotes}".`;
+    const prompt = `You are a senior financial analyst. Analyze the investment screenshot and the user's notes to identify ALL individual investments shown. 
+Return a single, valid JSON array. Each element in the array MUST be a JSON object with these exact fields and data types: "name" (string), "type" (string), "amount" (number, e.g., 126.50), "duration" (string, one of: "Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"), "grade" (string, one of: "A", "B", "C", "D", "F"), "riskScore" (number, an integer from 1 to 10), "roiEstimate" (number, e.g., 15.5), and "explanation" (string).\n\nIf there are multiple investments, each must be a separate object in the array. If there is only one, return an array with one object. Do not summarize or merge investments. Do NOT wrap it in markdown.\n\nThe user's notes are: "${additionalNotes}".`;
 
     console.log('Calling OpenAI API with image...');
     
@@ -60,6 +51,10 @@ Make the explanation comprehensive, professional, and insightful, similar to wha
       model: "gpt-4o",
       max_tokens: 1000,
       messages: [
+        {
+          role: "system",
+          content: "You are a financial data extraction assistant. Always return a JSON array of investments, one object per investment, never summarize or merge, and never wrap in markdown."
+        },
         {
           role: "user",
           content: [
@@ -109,66 +104,97 @@ Make the explanation comprehensive, professional, and insightful, similar to wha
       console.log('Processing response content:', jsonString);
       analysis = JSON.parse(jsonString);
 
-      // If the AI returns an array, take the first element as requested.
+      // If the AI returns an array, sanitize each investment
       if (Array.isArray(analysis)) {
-        console.log('AI returned an array, taking the first element as requested.');
-        analysis = analysis[0];
-      }
-      
-      // Sanitize and format the data from the AI
-      const rawAnalysis = analysis;
-      const sanitizedAnalysis = {};
-
-      sanitizedAnalysis.name = rawAnalysis.name || 'Investment from Screenshot';
-      sanitizedAnalysis.type = rawAnalysis.type || 'Unknown';
-
-      // Amount
-      let amount = 0;
-      if (typeof rawAnalysis.amount === 'string') {
-        amount = parseFloat(rawAnalysis.amount.replace(/[^0-9.-]+/g, ""));
-      } else if (typeof rawAnalysis.amount === 'number') {
-        amount = rawAnalysis.amount;
-      }
-      sanitizedAnalysis.amount = isNaN(amount) ? 0 : amount;
-
-      // Duration
-      const validDurations = ["Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"];
-      sanitizedAnalysis.duration = validDurations.includes(rawAnalysis.duration) ? rawAnalysis.duration : 'Unknown';
-
-      // Grade
-      const validGrades = ["A", "B", "C", "D", "F"];
-      sanitizedAnalysis.grade = validGrades.includes(rawAnalysis.grade) ? rawAnalysis.grade : 'N/A';
-
-      // Risk Score
-      let riskScore = 5; // Default
-      if (typeof rawAnalysis.riskScore === 'number') {
-        riskScore = Math.max(1, Math.min(10, rawAnalysis.riskScore));
-      } else if (typeof rawAnalysis.riskScore === 'string') {
-        const riskString = rawAnalysis.riskScore.toLowerCase();
-        if (riskString.includes('low')) riskScore = 3;
-        else if (riskString.includes('moderate')) riskScore = 6;
-        else if (riskString.includes('high')) riskScore = 8;
-        else {
-          const parsedInt = parseInt(riskString, 10);
-          if (!isNaN(parsedInt)) {
-            riskScore = Math.max(1, Math.min(10, parsedInt));
+        analysis = analysis.map(rawAnalysis => {
+          const sanitizedAnalysis = {};
+          sanitizedAnalysis.name = rawAnalysis.name || 'Investment from Screenshot';
+          sanitizedAnalysis.type = rawAnalysis.type || 'Unknown';
+          // Amount
+          let amount = 0;
+          if (typeof rawAnalysis.amount === 'string') {
+            amount = parseFloat(rawAnalysis.amount.replace(/[^0-9.-]+/g, ""));
+          } else if (typeof rawAnalysis.amount === 'number') {
+            amount = rawAnalysis.amount;
+          }
+          sanitizedAnalysis.amount = isNaN(amount) ? 0 : amount;
+          // Duration
+          const validDurations = ["Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"];
+          sanitizedAnalysis.duration = validDurations.includes(rawAnalysis.duration) ? rawAnalysis.duration : 'Unknown';
+          // Grade
+          const validGrades = ["A", "B", "C", "D", "F"];
+          sanitizedAnalysis.grade = validGrades.includes(rawAnalysis.grade) ? rawAnalysis.grade : 'N/A';
+          // Risk Score
+          let riskScore = 5; // Default
+          if (typeof rawAnalysis.riskScore === 'number') {
+            riskScore = Math.max(1, Math.min(10, rawAnalysis.riskScore));
+          } else if (typeof rawAnalysis.riskScore === 'string') {
+            const riskString = rawAnalysis.riskScore.toLowerCase();
+            if (riskString.includes('low')) riskScore = 3;
+            else if (riskString.includes('moderate')) riskScore = 6;
+            else if (riskString.includes('high')) riskScore = 8;
+            else {
+              const parsedInt = parseInt(riskString, 10);
+              if (!isNaN(parsedInt)) {
+                riskScore = Math.max(1, Math.min(10, parsedInt));
+              }
+            }
+          }
+          sanitizedAnalysis.riskScore = riskScore;
+          // ROI Estimate
+          let roiEstimate = 0;
+          if (typeof rawAnalysis.roiEstimate === 'string') {
+            roiEstimate = parseFloat(rawAnalysis.roiEstimate.replace(/[^0-9.-]+/g, ""));
+          } else if (typeof rawAnalysis.roiEstimate === 'number') {
+            roiEstimate = rawAnalysis.roiEstimate;
+          }
+          sanitizedAnalysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
+          sanitizedAnalysis.explanation = rawAnalysis.explanation || 'No explanation provided.';
+          return sanitizedAnalysis;
+        });
+      } else {
+        // Fallback: single object
+        const rawAnalysis = analysis;
+        const sanitizedAnalysis = {};
+        sanitizedAnalysis.name = rawAnalysis.name || 'Investment from Screenshot';
+        sanitizedAnalysis.type = rawAnalysis.type || 'Unknown';
+        let amount = 0;
+        if (typeof rawAnalysis.amount === 'string') {
+          amount = parseFloat(rawAnalysis.amount.replace(/[^0-9.-]+/g, ""));
+        } else if (typeof rawAnalysis.amount === 'number') {
+          amount = rawAnalysis.amount;
+        }
+        sanitizedAnalysis.amount = isNaN(amount) ? 0 : amount;
+        const validDurations = ["Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"];
+        sanitizedAnalysis.duration = validDurations.includes(rawAnalysis.duration) ? rawAnalysis.duration : 'Unknown';
+        const validGrades = ["A", "B", "C", "D", "F"];
+        sanitizedAnalysis.grade = validGrades.includes(rawAnalysis.grade) ? rawAnalysis.grade : 'N/A';
+        let riskScore = 5;
+        if (typeof rawAnalysis.riskScore === 'number') {
+          riskScore = Math.max(1, Math.min(10, rawAnalysis.riskScore));
+        } else if (typeof rawAnalysis.riskScore === 'string') {
+          const riskString = rawAnalysis.riskScore.toLowerCase();
+          if (riskString.includes('low')) riskScore = 3;
+          else if (riskString.includes('moderate')) riskScore = 6;
+          else if (riskString.includes('high')) riskScore = 8;
+          else {
+            const parsedInt = parseInt(riskString, 10);
+            if (!isNaN(parsedInt)) {
+              riskScore = Math.max(1, Math.min(10, parsedInt));
+            }
           }
         }
+        sanitizedAnalysis.riskScore = riskScore;
+        let roiEstimate = 0;
+        if (typeof rawAnalysis.roiEstimate === 'string') {
+          roiEstimate = parseFloat(rawAnalysis.roiEstimate.replace(/[^0-9.-]+/g, ""));
+        } else if (typeof rawAnalysis.roiEstimate === 'number') {
+          roiEstimate = rawAnalysis.roiEstimate;
+        }
+        sanitizedAnalysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
+        sanitizedAnalysis.explanation = rawAnalysis.explanation || 'No explanation provided.';
+        analysis = [sanitizedAnalysis];
       }
-      sanitizedAnalysis.riskScore = riskScore;
-
-      // ROI Estimate
-      let roiEstimate = 0;
-      if (typeof rawAnalysis.roiEstimate === 'string') {
-        roiEstimate = parseFloat(rawAnalysis.roiEstimate.replace(/[^0-9.-]+/g, ""));
-      } else if (typeof rawAnalysis.roiEstimate === 'number') {
-        roiEstimate = rawAnalysis.roiEstimate;
-      }
-      sanitizedAnalysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
-
-      sanitizedAnalysis.explanation = rawAnalysis.explanation || 'No explanation provided.';
-
-      analysis = sanitizedAnalysis;
     } catch (e) {
       console.error('Error parsing analysis response:', e);
       console.error('Raw response content:', response.choices[0].message.content);
@@ -195,9 +221,13 @@ Make the explanation comprehensive, professional, and insightful, similar to wha
       };
     }
     
-    // Add additional metadata
-    analysis.analysisDate = new Date().toISOString();
-    analysis.source = 'screenshot';
+    // Add additional metadata to each investment
+    if (Array.isArray(analysis)) {
+      analysis.forEach(inv => {
+        inv.analysisDate = new Date().toISOString();
+        inv.source = 'screenshot';
+      });
+    }
     
     // Return the analysis
     return res.json(analysis);
@@ -220,7 +250,4 @@ Make the explanation comprehensive, professional, and insightful, similar to wha
   }
 }
 
-module.exports = {
-  upload,
-  analyzeScreenshot
-};
+module.exports = [upload.single('screenshot'), analyzeScreenshot];

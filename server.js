@@ -5,10 +5,11 @@ const path = require('path');
 const multer = require('multer');
 const investmentHandler = require('./api/investment.js');
 const portfolioHandler = require('./api/portfolio.js');
-const analyzeScreenshotHandler = require('./api/analyze-screenshot.js');
 const batchScreenshotHandler = require('./api/batch-screenshot.js');
 const analyzeRealEstateHandler = require('./api/analyze-real-estate.js');
 const stressTestHandler = require('./api/stress-test.js');
+const analyzePortfolioHandler = require('./api/analyze-portfolio.js');
+const analyzeScreenshot = require('./api/screenshot.js');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -32,11 +33,6 @@ app.post('/api/portfolio', (req, res, next) => {
   portfolioHandler(req, res).catch(next);
 });
 
-// Screenshot analysis endpoints
-app.post('/api/analyze-screenshot', (req, res, next) => {
-  analyzeScreenshotHandler(req, res).catch(next);
-});
-
 // Real estate analysis endpoint
 app.post('/api/analyze-real-estate', (req, res, next) => {
   analyzeRealEstateHandler(req, res).catch(next);
@@ -49,44 +45,19 @@ app.post('/api/stress-test', (req, res, next) => {
 
 // Batch portfolio analysis endpoint
 app.post('/api/analyze-portfolio', (req, res, next) => {
-  console.log('Received request to /api/analyze-portfolio');
-  
-  // Log request headers for debugging
-  console.log('Request headers:', req.headers);
-  
-  // Handle file upload with multer - support multiple files with 'screenshots' field
-  const multerUpload = multer({ 
-    dest: 'uploads/',
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-  }).array('screenshots', 10); // Allow up to 10 files with field name 'screenshots'
-  
-  multerUpload(req, res, (err) => {
-    if (err) {
-      console.error('File upload error:', err);
-      return res.status(400).json({ 
-        error: 'File upload failed',
-        details: err.message 
-      });
-    }
-    
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ 
-        error: 'No files uploaded',
-        details: 'Please upload screenshot files with the key "screenshots"' 
-      });
-    }
-    
-    console.log('Files uploaded:', req.files.length);
-    
-    // Call the batch screenshot handler
-    batchScreenshotHandler(req, res).catch(error => {
-      console.error('Error in batchScreenshotHandler:', error);
-      res.status(500).json({ 
-        error: 'Failed to process portfolio',
-        details: error.message 
-      });
-    });
-  });
+  analyzePortfolioHandler(req, res).catch(next);
+});
+
+const upload = multer({ dest: 'uploads/' });
+// Batch screenshot recognition endpoint
+app.post('/api/batch-screenshot', upload.any(), batchScreenshotHandler);
+// Screenshot recognition endpoint
+app.post('/api/screenshot', ...analyzeScreenshot);
+
+// Test JSON parsing
+app.post('/api/test-json', (req, res) => {
+  console.log('Test JSON body:', req.body);
+  res.json({ received: req.body });
 });
 
 // Serve static files from the React app

@@ -15,15 +15,17 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { saveInvestment as firebaseSaveInvestment } from '../utils/firebase';
+import { analyzeInvestment } from '../utils/openai';
 
 // Global variable to persist registration error across component re-mounts
 let globalRegistrationError = '';
 
 const Registration = () => {
-  const { signUp } = useAuth();
+  const { signUp, updateUserProfile } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -146,6 +148,127 @@ const Registration = () => {
 
       if (user) {
         console.log('Registration successful, user created:', user);
+        // Set flag for dashboard to trigger analysis on first load
+        localStorage.setItem('needsPortfolioAnalysis', 'true');
+        // If there's portfolio analysis from onboarding, save it and the investments
+        if (parsedOnboardingData?.portfolioAnalysis) {
+          console.log('Found portfolio analysis in onboarding data:', parsedOnboardingData.portfolioAnalysis);
+          console.log('Investments to save:', parsedOnboardingData.portfolioAnalysis.investments);
+          
+          // Save investments first, even if analysis fails
+          if (parsedOnboardingData.portfolioAnalysis.investments && parsedOnboardingData.portfolioAnalysis.investments.length > 0) {
+            console.log('Saving investments for user:', user.uid);
+            console.log('Number of investments to save:', parsedOnboardingData.portfolioAnalysis.investments.length);
+            
+            for (const investment of parsedOnboardingData.portfolioAnalysis.investments) {
+              console.log('Processing investment:', investment);
+              
+              try {
+                // Get detailed analysis for each investment (same as Dashboard)
+                const analysis = await analyzeInvestment(
+                  {
+                    ...investment,
+                    type: investment.type || 'Stock',
+                    name: investment.name || 'Unnamed Investment',
+                    duration: 'Long-term' // Default duration for analysis
+                  },
+                  {
+                    experience: parsedOnboardingData.experience,
+                    riskTolerance: parsedOnboardingData.riskTolerance,
+                    interests: parsedOnboardingData.interests,
+                    primaryGoal: parsedOnboardingData.primaryGoal
+                  }
+                );
+                
+                // Merge the analysis with the investment data
+                const investmentWithAnalysis = {
+                  ...investment,
+                  roiScenarios: analysis.roiScenarios || {
+                    pessimistic: (analysis.roiEstimate || 8.5) * 0.8,
+                    realistic: analysis.roiEstimate || 8.5,
+                    optimistic: (analysis.roiEstimate || 8.5) * 1.2
+                  },
+                  roiEstimate: analysis.roiEstimate || 8.5,
+                  riskScore: analysis.riskScore || 5,
+                  grade: analysis.grade || 'B',
+                  explanation: analysis.explanation || 'Investment from onboarding'
+                };
+                
+                console.log('Investment with detailed analysis:', investmentWithAnalysis);
+                
+                const { id, error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithAnalysis);
+                if (investmentError) {
+                  console.error('Error saving onboarding investment:', investmentError);
+                } else {
+                  console.log('Successfully saved investment:', investment.name, 'with ID:', id);
+                }
+              } catch (analysisError) {
+                console.error('Error analyzing investment during registration:', analysisError);
+                
+                // Fallback to basic analysis if detailed analysis fails
+                const investmentWithBasicAnalysis = {
+                  ...investment,
+                  grade: parsedOnboardingData.portfolioAnalysis.grade || 'B',
+                  riskScore: parsedOnboardingData.portfolioAnalysis.riskScore || 5,
+                  roiEstimate: 8.5,
+                  roiScenarios: {
+                    pessimistic: 6.8,
+                    realistic: 8.5,
+                    optimistic: 10.2
+                  },
+                  explanation: parsedOnboardingData.portfolioAnalysis.summary || 'Investment from onboarding (basic analysis)'
+                };
+                
+                const { id, error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithBasicAnalysis);
+                if (investmentError) {
+                  console.error('Error saving onboarding investment with basic analysis:', investmentError);
+                } else {
+                  console.log('Successfully saved investment with basic analysis:', investment.name, 'with ID:', id);
+                }
+              }
+            }
+          } else {
+            console.log('No investments found in portfolio analysis');
+          }
+          
+          try {
+            // Get the full analysis for the user's portfolio
+            const fullAnalysisResponse = await fetch('/api/analyze-portfolio', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                investments: parsedOnboardingData.portfolioAnalysis.investments || [],
+                userProfile: {
+                  experience: parsedOnboardingData.experience,
+                  riskTolerance: parsedOnboardingData.riskTolerance,
+                  interests: parsedOnboardingData.interests,
+                  primaryGoal: parsedOnboardingData.primaryGoal
+                },
+                preview: false
+              }),
+            });
+
+            if (fullAnalysisResponse.ok) {
+              const fullAnalysis = await fullAnalysisResponse.json();
+              console.log('Full analysis received:', fullAnalysis);
+              
+              // Save the full analysis to the user's profile
+              await updateUserProfile({
+                portfolioAnalysis: fullAnalysis
+              });
+            } else {
+              console.error('Failed to get full analysis:', fullAnalysisResponse.status, fullAnalysisResponse.statusText);
+            }
+          } catch (analysisError) {
+            console.error('Error saving portfolio analysis:', analysisError);
+            // Don't fail registration if analysis saving fails
+          }
+        } else {
+          console.log('No portfolio analysis found in onboarding data');
+        }
+        
         // Clear onboarding data from localStorage
         localStorage.removeItem('onboardingData');
         globalRegistrationError = '';
@@ -217,20 +340,7 @@ const Registration = () => {
               </Typography>
             </Box>
 
-            {/* Success Message */}
-            <Alert 
-              severity="success" 
-              icon={<CheckCircleIcon />}
-              sx={{ 
-                mb: 3, 
-                borderRadius: '12px',
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                color: '#065f46'
-              }}
-            >
-              Great! Your profile is set up. Now let's create your account.
-            </Alert>
+
 
             {/* Error Alert */}
             {globalRegistrationError && (

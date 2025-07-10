@@ -14,9 +14,13 @@ import {
   updateUserProfile as firebaseUpdateUserProfile,
   checkEmailVerification,
   resendVerificationEmail,
-  sendPasswordResetEmailHandler
+  sendPasswordResetEmailHandler,
+  getPortfolioAnalysisAndHistory,
+  savePortfolioAnalysis,
+  deletePortfolioAnalysis // <-- add this import
 } from '../utils/firebase';
 import { deleteUser, updateEmail as firebaseUpdateEmail, sendEmailVerification } from 'firebase/auth';
+import { getPortfolioAnalysis } from '../utils/openai';
 
 const AuthContext = createContext();
 
@@ -36,6 +40,8 @@ export const AuthProvider = ({ children }) => {
   const [skipAuthListener, setSkipAuthListener] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [verificationLoading, setVerificationLoading] = useState(false);
+  const [portfolioAnalysis, setPortfolioAnalysis] = useState(null);
+  const [gradeHistory, setGradeHistory] = useState([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (user) => {
@@ -61,6 +67,44 @@ export const AuthProvider = ({ children }) => {
         if (!error && profile) {
           console.log('User profile found:', profile);
           setUserProfile(profile);
+          // --- Portfolio Analysis & Grade History Logic ---
+          // Only run if user profile is complete
+          if (profile && profile.experience && profile.riskTolerance && profile.interests && profile.primaryGoal) {
+            // Fetch latest analysis and history
+            const { analysis } = await getPortfolioAnalysisAndHistory(user.uid);
+            let needsUpdate = false;
+            let lastAnalysisDate = null;
+            let lastLoginDate = new Date();
+            if (analysis && analysis.updatedAt) {
+              lastAnalysisDate = new Date(analysis.updatedAt.seconds ? analysis.updatedAt.seconds * 1000 : analysis.updatedAt);
+            }
+            // Check if last analysis is older than 24h
+            if (!lastAnalysisDate || (Date.now() - lastAnalysisDate.getTime()) > 24 * 60 * 60 * 1000) {
+              // Check if user has logged in within last 7 days
+              if (!lastAnalysisDate || (Date.now() - lastAnalysisDate.getTime()) < 7 * 24 * 60 * 60 * 1000) {
+                needsUpdate = true;
+              }
+            }
+            let latestAnalysis = analysis;
+            if (needsUpdate) {
+              // Get user's investments
+              const { investments } = await firebaseGetUserInvestments(user.uid);
+              if (investments && investments.length > 0) {
+                // Run new analysis
+                const newAnalysis = await getPortfolioAnalysis(investments, profile);
+                // Save to Firestore (also updates grade history)
+                await savePortfolioAnalysis(user.uid, newAnalysis);
+                // Fetch updated analysis
+                const { analysis: updatedAnalysis } = await getPortfolioAnalysisAndHistory(user.uid);
+                latestAnalysis = updatedAnalysis;
+              }
+            }
+            setPortfolioAnalysis(latestAnalysis);
+            setGradeHistory(latestAnalysis?.gradeHistory || []);
+          } else {
+            setPortfolioAnalysis(null);
+            setGradeHistory([]);
+          }
         } else {
           console.log('No user profile found or error:', error);
           if (!error) {
@@ -219,6 +263,11 @@ export const AuthProvider = ({ children }) => {
       const { error: profileError } = await deleteUserProfile(user.uid);
       if (profileError) {
         console.error('Error deleting user profile:', profileError);
+      }
+      // Delete portfolio analysis
+      const { error: analysisError } = await deletePortfolioAnalysis(user.uid);
+      if (analysisError) {
+        console.error('Error deleting portfolio analysis:', analysisError);
       }
       // Delete the Firebase Auth user
       await deleteUser(user);
@@ -438,6 +487,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     emailVerified,
     verificationLoading,
+    portfolioAnalysis,
+    gradeHistory,
     signUp,
     signIn,
     signOut,
@@ -451,6 +502,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updateEmail,
     sendEmailVerificationToNewEmail,
+    setPortfolioAnalysis, // <-- add this line
   };
 
   return (

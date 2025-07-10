@@ -11,11 +11,17 @@ const openai = new OpenAI({
 module.exports = async (req, res) => {
   console.log('Received request to analyze portfolio screenshots');
   
-  // Files are already uploaded by multer in server.js
-  if (!req.files || req.files.length === 0) {
+  // Accept both 'screenshot' (single file) and 'screenshots' (multiple files)
+  let files = [];
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    files = req.files;
+  } else if (req.file) {
+    files = [req.file];
+  }
+  if (!files || files.length === 0) {
     return res.status(400).json({ 
       error: 'No files uploaded',
-      details: 'Please ensure you are sending files with the key "screenshots"'
+      details: 'Please ensure you are sending files with the key "screenshots" or "screenshot"'
     });
   }
 
@@ -23,7 +29,7 @@ module.exports = async (req, res) => {
     // Process all uploaded files
     const allInvestments = [];
     
-    for (const file of req.files) {
+    for (const file of files) {
       console.log('Processing file:', file.originalname);
       
       // Read the uploaded file

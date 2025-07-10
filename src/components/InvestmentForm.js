@@ -10,6 +10,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import Footer from './Footer';
+import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 // Utility function to determine color based on grade
 const getGradeColor = (grade) => {
@@ -33,6 +35,8 @@ const InvestmentForm = () => {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState('');
   const [additionalNotes, setAdditionalNotes] = useState('');
+
+  const navigate = useNavigate();
 
   // Simulate analysis progress (in a real app, this would come from the server)
   const simulateProgress = () => {
@@ -113,6 +117,35 @@ const InvestmentForm = () => {
       flexDirection: 'column'
     }}>
       <Container maxWidth="lg" sx={{ flex: 1 }}>
+        {/* Back to Dashboard Button */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+          <Button
+            onClick={() => navigate('/dashboard')}
+            startIcon={<ArrowBackIcon />}
+            variant="outlined"
+            sx={{
+              background: 'rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              color: 'white',
+              borderRadius: '12px',
+              px: 3,
+              py: 1.5,
+              fontWeight: 600,
+              textTransform: 'none',
+              mr: 3,
+              '&:hover': {
+                background: 'rgba(255,255,255,0.2)',
+                borderColor: 'rgba(255,255,255,0.4)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
         {/* Header Section */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
