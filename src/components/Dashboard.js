@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPortfolioAnalysis, analyzeInvestment } from '../utils/openai';
+import { getPortfolioAnalysis } from '../utils/openai';
 import { savePortfolioAnalysis } from '../utils/firebase'; // <-- add this import
 import { 
   Container, Box, Typography, Button, Grid, Paper, 
@@ -12,15 +12,11 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import SecurityIcon from '@mui/icons-material/Security';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 
 import ChatIcon from '@mui/icons-material/Chat';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import WarningIcon from '@mui/icons-material/Warning';
-import FastAddPortfolio from './FastAddPortfolio';
 import Footer from './Footer';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,13 +26,15 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import { interestOptions } from '../utils/constants';
 import ExploreIcon from '@mui/icons-material/Explore';
+
 import GradeProgressArc from './GradeProgressArc';
+import FastAddPortfolio from './FastAddPortfolio';
 
 console.log('Dashboard rendered');
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { user, userProfile, getUserInvestments, saveInvestment, deleteInvestment: deleteInvestmentFromFirebase, updateUserProfile, deleteAccount, portfolioAnalysis, gradeHistory, setPortfolioAnalysis } = useAuth(); // <-- add setPortfolioAnalysis
+  const { user, userProfile, getUserInvestments, updateUserProfile, deleteAccount, portfolioAnalysis, gradeHistory, setPortfolioAnalysis, saveInvestment } = useAuth(); // <-- add saveInvestment
   const [loading, setLoading] = useState(true);
   const [investments, setInvestments] = useState([]);
   const [stats, setStats] = useState({
@@ -49,6 +47,8 @@ const Dashboard = () => {
   const [accountSettingsOpen, setAccountSettingsOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState('');
   const [editingPrefs, setEditingPrefs] = useState(false);
   const [editName, setEditName] = useState(userProfile?.displayName || userProfile?.name || '');
   const [editExperience, setEditExperience] = useState(userProfile?.experience || '');
@@ -73,15 +73,16 @@ const Dashboard = () => {
   
   // Check if user has already had an analysis (for cross-device consistency)
   const [hasHadAnalysis, setHasHadAnalysis] = useState(false);
-  const [selectedInvestment, setSelectedInvestment] = useState(null);
-  const [fastAddOpen, setFastAddOpen] = useState(false);
   const [stressTestOpen, setStressTestOpen] = useState(false);
   const [stressTestInput, setStressTestInput] = useState('');
   const [stressTestLoading, setStressTestLoading] = useState(false);
   const [stressTestAnalysis, setStressTestAnalysis] = useState(null);
   const [stressTestError, setStressTestError] = useState('');
-  const [gradeModalOpen, setGradeModalOpen] = useState(false);
   const [portfolioAnalysisModalOpen, setPortfolioAnalysisModalOpen] = useState(false);
+  const [fastAddPortfolioOpen, setFastAddPortfolioOpen] = useState(false);
+  const [investmentRetryCount, setInvestmentRetryCount] = useState(0);
+  const maxInvestmentRetries = 10;
+  const investmentRetryDelay = 2000; // 2 seconds
 
   
 
@@ -154,6 +155,7 @@ const Dashboard = () => {
       console.log('New analysis received:', analysis); // <-- log new analysis
       await savePortfolioAnalysis(user.uid, analysis); // <-- save to Firestore
       setPortfolioAnalysis(analysis); // <-- update context/UI immediately
+      setPortfolioAnalysisModalOpen(true); // <-- open the modal with the new analysis
       // --- NEW: Update user profile to mark analysis as seen ---
       if (updateUserProfile && user && user.uid) {
         await updateUserProfile({ hasHadAnalysis: true, lastAnalysisDate: new Date().toISOString() });
@@ -172,16 +174,6 @@ const Dashboard = () => {
         errorMessage: err.message,
         errorStack: err.stack
       });
-      let errorMessage = 'Portfolio analysis failed: ';
-      if (err.message.includes('User profile not found')) {
-        errorMessage += 'Please complete your profile first.';
-      } else if (err.message.includes('User profile is incomplete')) {
-        errorMessage += 'Please complete your profile with all required fields.';
-      } else if (err.message.includes('investments') || err.message.includes('load failed')) {
-        errorMessage += 'Failed to load investments. Please refresh the page and try again.';
-      } else {
-        errorMessage += err.message || 'An unknown error occurred.';
-      }
       setLoading(false); // Hide spinner on error
     } finally {
       setPortfolioAnalysisLoading(false);
@@ -201,102 +193,6 @@ const Dashboard = () => {
     return '#64748b';
   };
 
-  const getGradeGradient = (grade) => {
-    if (!grade) return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-    const upperGrade = grade.toUpperCase();
-    if (upperGrade.startsWith('A')) return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-    if (upperGrade.startsWith('B')) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-    if (upperGrade.startsWith('C')) return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
-    if (upperGrade.startsWith('D')) return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-    if (upperGrade.startsWith('F')) return 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
-    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-  };
-
-  // Helper function to format ROI values (handles both decimal and percentage formats)
-  const formatROI = (value) => {
-    if (value === undefined || value === null) return '0.0';
-    const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
-    // If the value is less than 1, assume it's a decimal and multiply by 100
-    const displayValue = Math.abs(numValue) < 1 ? numValue * 100 : numValue;
-    return displayValue.toFixed(1);
-  };
-
-  const handleAddInvestments = async (newInvestments) => {
-    try {
-      // Process each new investment to ensure required fields and get analysis
-      const processedInvestments = await Promise.all(newInvestments.map(async (inv) => {
-        // Basic investment data
-        const baseInvestment = {
-          ...inv,
-          // Ensure required fields have default values
-          amount: parseFloat(inv.amount) || 0,
-          roiEstimate: inv.roiEstimate || 0,
-          riskScore: inv.riskScore || 5,
-          grade: inv.grade || 'B',
-          date: inv.date || new Date().toISOString().split('T')[0],
-        };
-
-        try {
-          // Get analysis for the investment
-          const analysis = await analyzeInvestment(
-            {
-              ...baseInvestment,
-              type: inv.type || 'Stock',
-              name: inv.name || 'Unnamed Investment',
-              duration: 'Long-term' // Default duration for analysis
-            },
-            userProfile
-          );
-          
-          // Merge the analysis with the base investment
-          return {
-            ...baseInvestment,
-            roiScenarios: analysis.roiScenarios || {
-              pessimistic: baseInvestment.roiEstimate * 0.8,
-              realistic: baseInvestment.roiEstimate,
-              optimistic: baseInvestment.roiEstimate * 1.2
-            },
-            roiEstimate: analysis.roiEstimate || baseInvestment.roiEstimate,
-            riskScore: analysis.riskScore || baseInvestment.riskScore,
-            grade: analysis.grade || baseInvestment.grade,
-            explanation: analysis.explanation || 'Automatically analyzed investment'
-          };
-        } catch (analysisError) {
-          console.error('Error analyzing investment:', analysisError);
-          // If analysis fails, use default values
-          return {
-            ...baseInvestment,
-            roiScenarios: {
-              pessimistic: baseInvestment.roiEstimate * 0.8,
-              realistic: baseInvestment.roiEstimate,
-              optimistic: baseInvestment.roiEstimate * 1.2
-            },
-            explanation: 'Automatically added investment (analysis not available)'
-          };
-        }
-      }));
-
-      // Save each investment to Firebase
-      for (const investment of processedInvestments) {
-        const { error } = await saveInvestment(investment);
-        if (error) {
-          console.error('Error saving investment:', error);
-        }
-      }
-
-      // Reload investments from Firebase
-      await loadInvestments();
-      
-      // Dismiss the expand portfolio banner since investments were added
-      setShowAddMoreMessage(false);
-      setExpandBannerDismissed(true);
-      localStorage.setItem('expandBannerDismissed', 'true');
-      
-    } catch (error) {
-      console.error('Error adding investments:', error);
-    }
-  };
-
   useEffect(() => {
     if (!user) {
       navigate('/login');
@@ -308,15 +204,27 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Only set loading to false if investments have been loaded (not null/undefined)
+    const expectedCountStr = localStorage.getItem('expectedInvestmentCount');
+    const expectedCount = expectedCountStr ? parseInt(expectedCountStr, 10) : null;
     if (
       userProfile &&
       Array.isArray(investments) &&
       investments !== null &&
       investments !== undefined
     ) {
+      if (expectedCount !== null && !isNaN(expectedCount)) {
+        if (investments.length < expectedCount && investmentRetryCount < maxInvestmentRetries) {
+          // Not all investments loaded yet, retry after delay
+          setTimeout(() => {
+            setInvestmentRetryCount((prev) => prev + 1);
+            loadInvestments();
+          }, investmentRetryDelay);
+          return;
+        }
+      }
       setLoading(false);
     }
-  }, [userProfile, investments]);
+  }, [userProfile, investments, investmentRetryCount, loadInvestments]);
 
   // Check if user has had analysis before (for cross-device consistency)
   useEffect(() => {
@@ -352,60 +260,14 @@ const Dashboard = () => {
 
   useEffect(() => {
     const needsAnalysis = localStorage.getItem('needsPortfolioAnalysis') === 'true';
-    if (portfolioAnalysis && needsAnalysis) {
-      setPortfolioAnalysisModalOpen(true);
+    if (needsAnalysis && !portfolioAnalysisModalOpen) {
+      handleGetPortfolioAnalysis().then(() => {
+        setAutoAnalysisComplete(true);
+      });
+    } else {
+      setAutoAnalysisComplete(true);
     }
-  }, [portfolioAnalysis]);
-
-  const handleOpenModal = (investment) => {
-    setSelectedInvestment(investment);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedInvestment(null);
-  };
-
-  const deleteInvestment = async (investment) => {
-    if (window.confirm('Are you sure you want to delete this investment?')) {
-      try {
-        // Delete from Firebase
-        const { error } = await deleteInvestmentFromFirebase(investment.id);
-        if (error) {
-          console.error('Error deleting investment:', error);
-          return;
-        }
-
-        // Remove from local state
-        const updatedInvestments = investments.filter(
-          inv => inv.id !== investment.id
-        );
-        setInvestments(updatedInvestments);
-        
-        // Recalculate stats
-        if (updatedInvestments.length > 0) {
-          const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-          const avgROI = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate), 0) / updatedInvestments.length;
-          const avgRisk = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / updatedInvestments.length;
-
-          setStats({
-            totalPortfolio: total,
-            avgROI,
-            avgRisk,
-            investmentCount: updatedInvestments.length,
-          });
-        } else {
-          setStats({
-            totalPortfolio: 0,
-            avgROI: 0,
-            avgRisk: 0,
-            investmentCount: 0,
-          });
-        }
-      } catch (error) {
-        console.error('Error deleting investment:', error);
-      }
-    }
-  };
+  }, [portfolioAnalysisModalOpen, handleGetPortfolioAnalysis]);
 
   const handleOpenStressTest = () => setStressTestOpen(true);
   const handleCloseStressTest = () => {
@@ -544,23 +406,8 @@ const Dashboard = () => {
       title: 'Total Portfolio', 
       value: `$${stats.totalPortfolio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      icon: <AccountBalanceWalletIcon sx={{ fontSize: 28 }} />,
-    },
-    { 
-      id: 'roi', 
-      title: 'Avg Yearly ROI', 
-      value: `${stats.avgROI.toFixed(1)}%`, 
-      gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-      icon: <TrendingUpIcon sx={{ fontSize: 28 }} />,
-    },
-    { 
-      id: 'risk', 
-      title: 'Avg Risk', 
-      value: `${stats.avgRisk.toFixed(1)}/10`, 
-      gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-      icon: <SecurityIcon sx={{ fontSize: 28 }} />,
-    },
-
+      icon: <AccountCircleIcon sx={{ fontSize: 28 }} />, 
+    }
   ];
 
 
@@ -576,17 +423,6 @@ const Dashboard = () => {
     { value: 'aggressive', label: 'Aggressive' },
   ];
 
-  // Half-circle SVG progress for grade
-  const getGradePercent = (grade) => {
-    if (!grade) return 0;
-    const upper = grade.toUpperCase();
-    if (upper.startsWith('A')) return 1;
-    if (upper.startsWith('B')) return 0.75;
-    if (upper.startsWith('C')) return 0.5;
-    if (upper.startsWith('D')) return 0.25;
-    return 0.1;
-  };
-
   useEffect(() => {
     const needsAnalysis = localStorage.getItem('needsPortfolioAnalysis') === 'true';
     if (needsAnalysis && !portfolioAnalysisModalOpen) {
@@ -596,7 +432,7 @@ const Dashboard = () => {
     } else {
       setAutoAnalysisComplete(true);
     }
-  }, [portfolioAnalysisModalOpen]);
+  }, [portfolioAnalysisModalOpen, handleGetPortfolioAnalysis]);
 
   if (!autoAnalysisComplete) {
     return (
@@ -622,6 +458,42 @@ const Dashboard = () => {
     setPortfolioAnalysisModalOpen(false);
     localStorage.removeItem('needsPortfolioAnalysis');
     console.log('Removed needsPortfolioAnalysis flag from localStorage');
+  };
+
+  const handleAddInvestments = async (selectedInvestments) => {
+    try {
+      console.log('Adding investments:', selectedInvestments);
+      
+      // Add each selected investment to the user's portfolio
+      for (const investment of selectedInvestments) {
+        console.log('Saving investment:', {
+          name: investment.name,
+          type: investment.type,
+          amount: investment.amount,
+          roiEstimate: investment.roiEstimate,
+          riskScore: investment.riskScore,
+          grade: investment.grade,
+          hasExplanation: !!investment.explanation,
+          hasRoiScenarios: !!investment.roiScenarios
+        });
+        if (user && user.uid) {
+          // Use the saveInvestment function from the auth context
+          const { error } = await saveInvestment(investment);
+          if (error) {
+            throw new Error(`Failed to save investment ${investment.name}: ${error.message}`);
+          }
+        }
+      }
+      
+      // Reload investments to show the new ones
+      await loadInvestments();
+      
+      // Show success message
+      console.log(`Successfully added ${selectedInvestments.length} investments`);
+    } catch (error) {
+      console.error('Error adding investments:', error);
+      throw error; // Re-throw so the modal can handle the error
+    }
   };
 
   return (
@@ -658,7 +530,8 @@ const Dashboard = () => {
                 fontWeight: 800,
                 letterSpacing: '-0.02em',
                 mb: 1,
-                textShadow: '0 4px 20px rgba(0,0,0,0.1)'
+                textShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                ml: 3
               }}
             >
               FlowInvest
@@ -722,7 +595,6 @@ const Dashboard = () => {
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                       <Button
-                        onClick={() => setFastAddOpen(true)}
                         variant="contained"
                         startIcon={<AddIcon />}
                         sx={{
@@ -746,11 +618,6 @@ const Dashboard = () => {
                         Add More Investments
                       </Button>
                       <Button
-                        onClick={() => { 
-                          setShowAddMoreMessage(false); 
-                          setExpandBannerDismissed(true);
-                          localStorage.setItem('expandBannerDismissed', 'true');
-                        }}
                         variant="outlined"
                         startIcon={<ExploreIcon />}
                         sx={{
@@ -783,7 +650,7 @@ const Dashboard = () => {
                   <Button 
                     variant="outlined" 
                     onClick={handleGetPortfolioAnalysis} 
-                    disabled={investments.length === 0 || portfolioAnalysisLoading}
+                    disabled={!user || portfolioAnalysisLoading}
                     startIcon={portfolioAnalysisLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <AnalyticsIcon />}
                     sx={{
                       background: 'rgba(255,255,255,0.1)',
@@ -865,7 +732,7 @@ const Dashboard = () => {
                   </Button>
                   <Button
                     variant="outlined"
-                    onClick={() => setFastAddOpen(true)}
+                    onClick={() => setFastAddPortfolioOpen(true)}
                     sx={{
                       background: 'rgba(255,255,255,0.1)',
                       backdropFilter: 'blur(10px)',
@@ -917,7 +784,6 @@ const Dashboard = () => {
                 {statCards.map((card, index) => (
                   <Grid item xs={12} sm={6} lg={3} key={card.id}>
                     <Paper
-                      onClick={() => card.id === 'portfolio' ? navigate('/portfolio') : null}
                       sx={{
                         background: card.gradient,
                         borderRadius: '20px',
@@ -927,11 +793,22 @@ const Dashboard = () => {
                         overflow: 'hidden',
                         border: '1px solid rgba(255,255,255,0.2)',
                         backdropFilter: 'blur(10px)',
-                        cursor: card.id === 'portfolio' ? 'pointer' : 'default',
+                        cursor: 'default',
                         transition: 'all 0.3s ease',
                         '&:hover': {
-                          transform: card.id === 'portfolio' ? 'translateY(-8px)' : 'none',
-                          boxShadow: card.id === 'portfolio' ? '0 20px 40px rgba(0,0,0,0.15)' : 'none'
+                          transform: 'none',
+                          boxShadow: 'none',
+                          background: card.gradient
+                        },
+                        '&:focus': {
+                          outline: 'none',
+                          boxShadow: 'none',
+                          background: card.gradient
+                        },
+                        '&:active': {
+                          outline: 'none',
+                          boxShadow: 'none',
+                          background: card.gradient
                         },
                         '&::before': {
                           content: '""',
@@ -946,7 +823,7 @@ const Dashboard = () => {
                         },
                         '&:hover::before': {
                           opacity: card.id === 'portfolio' ? 1 : 0
-                        }
+                        },
                       }}
                     >
                       <Box sx={{ position: 'relative', zIndex: 1 }}>
@@ -961,7 +838,6 @@ const Dashboard = () => {
                             {card.icon}
                           </Avatar>
                         </Box>
-                        
                         <Typography 
                           variant="h4" 
                           sx={{ 
@@ -973,7 +849,6 @@ const Dashboard = () => {
                         >
                           {card.value}
                         </Typography>
-                        
                         <Typography 
                           variant="body2" 
                           sx={{ 
@@ -984,351 +859,82 @@ const Dashboard = () => {
                         >
                           {card.title}
                         </Typography>
+                        {/* Add buttons for portfolio card */}
+                        {card.id === 'portfolio' && (
+                          <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                            <Button
+                              variant="outlined"
+                              sx={{
+                                flex: 1,
+                                borderRadius: '8px',
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                background: 'white',
+                                color: '#667eea',
+                                border: '2px solid #667eea',
+                                boxShadow: '0 2px 8px rgba(102,126,234,0.08)',
+                                fontSize: '0.95rem',
+                                letterSpacing: 0.2,
+                                px: 1.5,
+                                py: 0.5,
+                                minWidth: 0,
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                  background: '#f3f6fd',
+                                  boxShadow: '0 6px 18px rgba(102,126,234,0.18)',
+                                  color: '#4f65c0',
+                                  borderColor: '#4f65c0',
+                                  transform: 'translateY(-2px) scale(1.03)',
+                                },
+                                '&:active': { background: 'transparent', boxShadow: 'none' },
+                              }}
+                              onClick={() => navigate('/portfolio')}
+                            >
+                              See Details
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              color="success"
+                              sx={{
+                                flex: 1,
+                                borderRadius: '12px',
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                background: `linear-gradient(135deg, rgba(102,126,234,0.55) 0%, rgba(118,75,162,0.55) 100%)`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                p: 0,
+                                border: '2.5px solid #9ca3af',
+                                boxShadow: 'none',
+                                minHeight: 0,
+                                minWidth: 0,
+                                width: 104,
+                                height: 104,
+                                maxWidth: 120,
+                                maxHeight: 120,
+                                '&:hover': { background: 'transparent', boxShadow: 'none' },
+                                '&:active': { background: 'transparent', boxShadow: 'none' },
+                                '&:focus': { background: 'transparent', boxShadow: 'none' },
+                              }}
+                              onClick={() => setPortfolioAnalysisModalOpen(true)}
+                              disabled={!portfolioAnalysis}
+                            >
+                              <GradeProgressArc grade={portfolioAnalysis?.grade} size={116} fontSize={80} />
+                              <Box sx={{ width: '100%', textAlign: 'center', mt: 0.4 }}>
+                                <span style={{ fontSize: '0.72rem', color: '#e0e7ef', opacity: 0.8, fontWeight: 500 }}>
+                                  Click to see more
+                                </span>
+                              </Box>
+                            </Button>
+                          </Box>
+                        )}
                       </Box>
                     </Paper>
                   </Grid>
                 ))}
               </Grid>
-
-              {/* Portfolio Analysis Section - always visible */}
-              {portfolioAnalysis && (
-                <Box sx={{ mb: 6 }}>
-                  <Paper sx={{
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(102, 126, 234, 0.2)',
-                    borderRadius: '20px',
-                    p: 4,
-                    mb: 3,
-                    maxWidth: 600,
-                    margin: '0 auto',
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                      <Box onClick={() => setGradeModalOpen(true)} sx={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        mr: 3,
-                        boxShadow: '0 8px 25px rgba(0,0,0,0.15)',
-                        cursor: 'pointer',
-                        position: 'relative',
-                        transition: 'box-shadow 0.2s',
-                        '&:hover': {
-                          boxShadow: '0 0 0 4px #10b98144',
-                        },
-                      }}>
-                        <GradeProgressArc grade={portfolioAnalysis.grade} size={80} />
-                      </Box>
-                      <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1e293b', mb: 1 }}>
-                          Portfolio Analysis
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: '#f3f4f6' }}>
-                          {investments.length} investments analyzed
-                        </Typography>
-                      </Box>
-                    </Box>
-                    
-                    <Typography variant="body1" sx={{ color: '#f3f4f6', mb: 3, fontSize: '1.1rem', lineHeight: 1.6 }}>
-                      {portfolioAnalysis.summary || portfolioAnalysis.analysis || portfolioAnalysis.detailedAnalysis || ''}
-                    </Typography>
-                    
-                    {portfolioAnalysis.recommendations && (
-                      <Box sx={{ 
-                        p: 3, 
-                        background: 'rgba(255,255,255,0.8)', 
-                        borderRadius: '12px',
-                        border: '1px solid rgba(102, 126, 234, 0.2)'
-                      }}>
-                        <Typography variant="h6" sx={{ color: '#1e293b', mb: 2, fontWeight: 600 }}>
-                          📊 Key Recommendations
-                        </Typography>
-                        <Typography variant="body1" component="div" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-                          {Array.isArray(portfolioAnalysis.recommendations) 
-                            ? portfolioAnalysis.recommendations.map((rec, index) => (
-                                <Box key={index} sx={{ mb: 1 }}>
-                                  <strong>{typeof rec === 'string' ? rec : (rec?.name || 'Recommendation')}</strong>
-                                  {typeof rec === 'object' && rec?.reason && (
-                                    <Typography variant="body2" sx={{ color: '#64748b', mt: 0.5 }}>
-                                      {rec.reason}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              ))
-                            : portfolioAnalysis.recommendations
-                          }
-                        </Typography>
-                      </Box>
-                    )}
-                  </Paper>
-                </Box>
-              )}
-
-
-
-
-
-              <FastAddPortfolio 
-                open={fastAddOpen} 
-                onClose={() => setFastAddOpen(false)}
-                onAddInvestments={handleAddInvestments}
-              />
-
-              {/* Investment Detail Modal */}
-              {selectedInvestment && (
-                <Modal
-                  open={!!selectedInvestment}
-                  onClose={handleCloseModal}
-                  closeAfterTransition
-                  BackdropComponent={Backdrop}
-                  BackdropProps={{
-                    timeout: 500,
-                    sx: { backdropFilter: 'blur(10px)' }
-                  }}
-                >
-                  <Fade in={!!selectedInvestment}>
-                    <Box sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: { xs: '95%', sm: '90%', md: 700 },
-                      maxHeight: '90vh',
-                      overflowY: 'auto',
-                      background: 'rgba(255,255,255,0.95)',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: '24px',
-                      p: { xs: 3, sm: 4 },
-                      boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
-                    }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                        <Box sx={{
-                          width: 80,
-                          height: 80,
-                          borderRadius: '50%',
-                          background: getGradeGradient(selectedInvestment.grade),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          mr: 3,
-                          border: '3px solid rgba(255,255,255,0.5)',
-                          boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                        }}>
-                          <Typography
-                            sx={{
-                              fontWeight: 800,
-                              fontSize: '2rem',
-                              color: 'white',
-                              textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                            }}
-                          >
-                            {selectedInvestment.grade}
-                          </Typography>
-                        </Box>
-                        
-                        <Box>
-                          <Typography 
-                            variant="h4" 
-                            component="h2" 
-                            sx={{ 
-                              fontWeight: 700,
-                              color: '#1e293b',
-                              mb: 1,
-                              fontSize: { xs: '1.5rem', sm: '2rem' }
-                            }}
-                          >
-                            {selectedInvestment.name}
-                          </Typography>
-                          <Chip 
-                            label={selectedInvestment.type}
-                            sx={{
-                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                              color: 'white',
-                              fontWeight: 600
-                            }}
-                          />
-                        </Box>
-                      </Box>
-
-                      <Grid container spacing={3} sx={{ mb: 4 }}>
-                        <Grid item xs={12} sm={4}>
-                          <Paper sx={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            borderRadius: '16px',
-                            p: 3,
-                            textAlign: 'center',
-                            color: 'white'
-                          }}>
-                            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                              Investment Amount
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                              ${parseFloat(selectedInvestment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={4}>
-                          <Paper sx={{
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            borderRadius: '16px',
-                            p: 3,
-                            textAlign: 'center',
-                            color: 'white'
-                          }}>
-                            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                              Expected ROI
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                              {formatROI(selectedInvestment.roiEstimate)}%
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                        
-                        <Grid item xs={12} sm={4}>
-                          <Paper sx={{
-                            background: selectedInvestment.riskScore > 7 
-                              ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                              : selectedInvestment.riskScore > 4
-                              ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                              : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            borderRadius: '16px',
-                            p: 3,
-                            textAlign: 'center',
-                            color: 'white'
-                          }}>
-                            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                              Risk Score
-                            </Typography>
-                            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                              {selectedInvestment.riskScore}/10
-                            </Typography>
-                          </Paper>
-                        </Grid>
-                      </Grid>
-
-                      {/* Cashflow Analysis Card (only for real estate with cashflow data) */}
-                      {selectedInvestment.type === 'Real Estate' && (selectedInvestment.cashflow || selectedInvestment.cashflowAfterMortgage) && (
-                        <Grid item xs={12}>
-                          <Paper sx={{
-                            background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
-                            borderRadius: '16px',
-                            p: 3,
-                            textAlign: 'center',
-                            color: 'white'
-                          }}>
-                            <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                              Monthly Cashflow
-                            </Typography>
-                            <Grid container spacing={2} justifyContent="center">
-                              <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
-                                  Gross Monthly Cashflow
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                  {selectedInvestment.cashflow ? `€${parseFloat(selectedInvestment.cashflow).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
-                                </Typography>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
-                                <Typography variant="subtitle2" sx={{ opacity: 0.8 }}>
-                                  Net Cashflow After Mortgage
-                                </Typography>
-                                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                                  {selectedInvestment.cashflowAfterMortgage ? `€${parseFloat(selectedInvestment.cashflowAfterMortgage).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'N/A'}
-                                </Typography>
-                              </Grid>
-                            </Grid>
-                          </Paper>
-                        </Grid>
-                      )}
-
-                      {selectedInvestment.roiScenarios && (
-                        <Box sx={{ mb: 4 }}>
-                          <Typography variant="h6" sx={{ mb: 3, fontWeight: 600, color: '#1e293b' }}>
-                            ROI Scenarios
-                          </Typography>
-                          <Grid container spacing={2}>
-                            <Grid item xs={4}>
-                              <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="body2" sx={{ color: '#64748b', mb: 1, fontWeight: 600 }}>
-                                  Pessimistic
-                                </Typography>
-                                <Typography variant="h6" sx={{ color: '#ef4444', fontWeight: 700 }}>
-                                  {formatROI(selectedInvestment.roiScenarios.pessimistic)}%
-                                </Typography>
-                              </Box>
-                            </Grid>
-                            <Grid item xs={4}>
-                              <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="body2" sx={{ color: '#64748b', mb: 1, fontWeight: 600 }}>
-                                  Realistic
-                                </Typography>
-                                <Typography variant="h6" sx={{ color: '#f59e0b', fontWeight: 700 }}>
-                                  {formatROI(selectedInvestment.roiScenarios.realistic)}%
-                                </Typography>
-                              </Box>
-                            </Grid>
-                            <Grid item xs={4}>
-                              <Box sx={{ textAlign: 'center' }}>
-                                <Typography variant="body2" sx={{ color: '#64748b', mb: 1, fontWeight: 600 }}>
-                                  Optimistic
-                                </Typography>
-                                <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 700 }}>
-                                  {formatROI(selectedInvestment.roiScenarios.optimistic)}%
-                                </Typography>
-                              </Box>
-                            </Grid>
-                          </Grid>
-                        </Box>
-                      )}
-
-                      {selectedInvestment.explanation && (
-                        <Box sx={{ mb: 4 }}>
-                          <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1e293b' }}>
-                            AI Analysis
-                          </Typography>
-                          <Paper sx={{
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            borderRadius: '12px',
-                            p: 3,
-                            border: '1px solid rgba(226, 232, 240, 0.8)'
-                          }}>
-                            <Typography variant="body1" sx={{ color: '#475569', lineHeight: 1.6 }}>
-                              {selectedInvestment.explanation}
-                            </Typography>
-                          </Paper>
-                        </Box>
-                      )}
-
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                        <Button 
-                          onClick={handleCloseModal}
-                          variant="contained"
-                          sx={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            borderRadius: '12px',
-                            px: 4,
-                            py: 1.5,
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            '&:hover': {
-                              transform: 'translateY(-2px)',
-                              boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                            },
-                            transition: 'all 0.3s ease'
-                          }}
-                        >
-                          Close
-                        </Button>
-                      </Box>
-                    </Box>
-                  </Fade>
-                </Modal>
-              )}
 
               {/* Portfolio Analysis Modal */}
               {portfolioAnalysis && (
@@ -1507,6 +1113,24 @@ const Dashboard = () => {
                               <Legend />
                               <Line type="monotone" dataKey="yourPortfolio" name="Your Portfolio" stroke="#667eea" strokeWidth={3} dot={{ r: 4 }} />
                               <Line type="monotone" dataKey="withRecommendations" name="Your Portfolio with our recommendations" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </Box>
+                      )}
+
+                      {/* Grade History Graph */}
+                      {Array.isArray(gradeHistory) && gradeHistory.length > 0 && (
+                        <Box sx={{ mt: 6, mb: 2 }}>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2, textAlign: 'center' }}>
+                            Grade History (30 days)
+                          </Typography>
+                          <ResponsiveContainer width="100%" height={180}>
+                            <LineChart data={gradeHistory.map(g => ({ ...g, num: g.grade?.charCodeAt(0) }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                              <YAxis dataKey="num" domain={[65, 70]} tickFormatter={v => String.fromCharCode(v)} ticks={[65, 66, 67, 68, 70]} />
+                              <RechartsTooltip formatter={(v, n, p) => n === 'num' ? String.fromCharCode(v) : v} />
+                              <Line type="monotone" dataKey="num" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} />
                             </LineChart>
                           </ResponsiveContainer>
                         </Box>
@@ -2232,7 +1856,11 @@ const Dashboard = () => {
               {/* Delete Account Confirmation Dialog */}
               <Dialog 
                 open={deleteAccountOpen} 
-                onClose={() => setDeleteAccountOpen(false)}
+                onClose={() => {
+                  setDeleteAccountOpen(false);
+                  setDeleteAccountPassword('');
+                  setDeleteAccountError('');
+                }}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
@@ -2284,11 +1912,43 @@ const Dashboard = () => {
                       • All your analysis and recommendations
                     </Typography>
                   </Box>
+                  
+                  {/* Password Input */}
+                  <Box sx={{ mt: 3 }}>
+                    <Typography variant="body1" sx={{ color: '#1e293b', mb: 2, fontWeight: 600 }}>
+                      Enter your password to confirm:
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      type="password"
+                      value={deleteAccountPassword}
+                      onChange={(e) => setDeleteAccountPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      variant="outlined"
+                      error={!!deleteAccountError}
+                      helperText={deleteAccountError}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          '&:hover fieldset': {
+                            borderColor: deleteAccountError ? '#ef4444' : '#667eea'
+                          },
+                          '&.Mui-focused fieldset': {
+                            borderColor: deleteAccountError ? '#ef4444' : '#667eea'
+                          }
+                        }
+                      }}
+                    />
+                  </Box>
                 </DialogContent>
                 
                 <DialogActions sx={{ p: 3, pt: 0 }}>
                   <Button
-                    onClick={() => setDeleteAccountOpen(false)}
+                    onClick={() => {
+                      setDeleteAccountOpen(false);
+                      setDeleteAccountPassword('');
+                      setDeleteAccountError('');
+                    }}
                     variant="outlined"
                     sx={{
                       borderColor: '#64748b',
@@ -2308,12 +1968,28 @@ const Dashboard = () => {
                   </Button>
                   <Button
                     onClick={async () => {
+                      // Validate password
+                      if (!deleteAccountPassword.trim()) {
+                        setDeleteAccountError('Please enter your password');
+                        return;
+                      }
+                      
+                      setDeleteAccountError('');
                       setDeleteAccountLoading(true);
                       try {
-                        const { error } = await deleteAccount();
+                        const { error } = await deleteAccount({
+                          email: user.email,
+                          password: deleteAccountPassword
+                        });
                         if (error) {
                           console.error('Error deleting account:', error);
-                          // You might want to show an error message here
+                          if (error.code === 'auth/requires-recent-login') {
+                            setDeleteAccountError('Your session has expired. Please enter your password to continue.');
+                          } else if (error.code === 'auth/wrong-password') {
+                            setDeleteAccountError('Incorrect password. Please try again.');
+                          } else {
+                            setDeleteAccountError(error.message || 'Failed to delete account. Please try again.');
+                          }
                         } else {
                           // Account deleted successfully, redirect to landing page
                           // Force a page refresh to ensure auth state is properly cleared
@@ -2321,14 +1997,14 @@ const Dashboard = () => {
                         }
                       } catch (error) {
                         console.error('Unexpected error deleting account:', error);
+                        setDeleteAccountError('An unexpected error occurred. Please try again.');
                       } finally {
                         setDeleteAccountLoading(false);
-                        setDeleteAccountOpen(false);
                       }
                     }}
                     variant="contained"
                     color="error"
-                    disabled={deleteAccountLoading}
+                    disabled={deleteAccountLoading || !deleteAccountPassword.trim()}
                     startIcon={deleteAccountLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
                     sx={{
                       background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -2350,6 +2026,15 @@ const Dashboard = () => {
                   </Button>
                 </DialogActions>
               </Dialog>
+
+              {/* Fast Add Portfolio Modal */}
+              <FastAddPortfolio
+                open={fastAddPortfolioOpen}
+                onClose={() => setFastAddPortfolioOpen(false)}
+                onAddInvestments={handleAddInvestments}
+                userProfile={userProfile}
+              />
+
               <Footer />
               {/* Mobile Top-Right Account Button */}
               {!accountSettingsOpen && (
@@ -2390,26 +2075,6 @@ const Dashboard = () => {
                   </Tooltip>
                 </Box>
               )}
-              {/* --- GRADE MODAL --- */}
-              <Modal open={gradeModalOpen} onClose={() => setGradeModalOpen(false)} closeAfterTransition BackdropComponent={Backdrop} BackdropProps={{ timeout: 300 }}>
-                <Fade in={gradeModalOpen}>
-                  <Box sx={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', bgcolor: 'background.paper', borderRadius: 3, boxShadow: 24, p: 3, width: '90vw', maxWidth: 400 }}>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 700, textAlign: 'center' }}>Grade History (30 days)</Typography>
-                    <Box sx={{ width: '100%', height: 180 }}>
-                      <ResponsiveContainer width="100%" height={180}>
-                        <LineChart data={gradeHistory.map(g => ({ ...g, num: g.grade?.charCodeAt(0) }))} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                          <YAxis dataKey="num" domain={[65, 70]} tickFormatter={v => String.fromCharCode(v)} ticks={[65, 66, 67, 68, 70]} />
-                          <RechartsTooltip formatter={(v, n, p) => n === 'num' ? String.fromCharCode(v) : v} />
-                          <Line type="monotone" dataKey="num" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} isAnimationActive={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </Box>
-                    <Button fullWidth variant="contained" sx={{ mt: 2 }} onClick={() => setGradeModalOpen(false)}>Close</Button>
-                  </Box>
-                </Fade>
-              </Modal>
             </>
           )}
         </Container>

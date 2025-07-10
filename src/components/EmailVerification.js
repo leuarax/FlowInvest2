@@ -6,11 +6,9 @@ import {
   Typography,
   Paper,
   Fade,
-  Alert,
-  CircularProgress
+  Alert
 } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import { useAuth } from '../contexts/AuthContext';
 
 const EmailVerification = () => {
@@ -133,7 +131,6 @@ const EmailVerification = () => {
                 size="large"
                 onClick={handleCheckVerification}
                 disabled={verificationLoading}
-                startIcon={verificationLoading ? <CircularProgress size={20} /> : <RefreshIcon />}
                 sx={{
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   borderRadius: '12px',

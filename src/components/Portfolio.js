@@ -21,14 +21,19 @@ import {
   Avatar,
   IconButton,
   Tooltip,
-  LinearProgress
+  LinearProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   Delete as DeleteIcon,
   TrendingUp as TrendingUpIcon,
   Security as SecurityIcon,
-  AccountBalanceWallet as AccountBalanceWalletIcon
+  AccountBalanceWallet as AccountBalanceWalletIcon,
+  ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import Footer from './Footer';
 
@@ -44,6 +49,7 @@ const Portfolio = () => {
     avgRisk: 0,
     investmentCount: 0,
   });
+  const [roiModalOpen, setRoiModalOpen] = useState(false);
 
   const loadInvestments = useCallback(async () => {
     try {
@@ -232,6 +238,26 @@ const Portfolio = () => {
             Portfolio Details
           </Typography>
         </Box>
+        {/* Avg Yearly ROI and Avg Risk Cards */}
+        <Box sx={{ display: 'flex', gap: 3, mb: 4 }}>
+          <Paper
+            sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', boxShadow: 3, cursor: 'pointer', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 8px 24px #f093fb55' } }}
+            onClick={() => setRoiModalOpen(true)}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <TrendingUpIcon sx={{ fontSize: 32 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Avg Yearly ROI</Typography>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>{stats.avgROI.toFixed(1)}%</Typography>
+          </Paper>
+          <Paper sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', boxShadow: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <SecurityIcon sx={{ fontSize: 32 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Avg Risk</Typography>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>{stats.avgRisk.toFixed(1)}/10</Typography>
+          </Paper>
+        </Box>
 
 
 
@@ -411,6 +437,13 @@ const Portfolio = () => {
                   </TableBody>
                 </Table>
               </TableContainer>
+              {/* Scroll Indicator */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', mt: 1, mb: 2, gap: 1 }}>
+                <Typography variant="body2" sx={{ color: 'white', opacity: 0.7, fontWeight: 500 }}>
+                  scroll
+                </Typography>
+                <ArrowForwardIcon sx={{ color: 'white', opacity: 0.7, fontSize: 18 }} />
+              </Box>
             </Box>
           )}
         </Box>
@@ -642,6 +675,66 @@ const Portfolio = () => {
           </Modal>
         )}
       </Container>
+      {/* ROI Calculation Modal */}
+      <Dialog open={roiModalOpen} onClose={() => setRoiModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, color: '#f093fb' }}>Average ROI Calculation</DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            The table below shows the pessimistic, realistic, and optimistic ROI for each investment. The average for each scenario is shown at the bottom.
+          </Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell><b>Investment</b></TableCell>
+                  <TableCell align="right"><b>Pessimistic</b></TableCell>
+                  <TableCell align="right"><b>Realistic</b></TableCell>
+                  <TableCell align="right"><b>Optimistic</b></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {investments.map((inv, idx) => (
+                  <TableRow key={idx}>
+                    <TableCell>{inv.name}</TableCell>
+                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.pessimistic).toFixed(1)}%` : '-'}</TableCell>
+                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.realistic).toFixed(1)}%` : '-'}</TableCell>
+                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.optimistic).toFixed(1)}%` : '-'}</TableCell>
+                  </TableRow>
+                ))}
+                {/* Averages Row */}
+                <TableRow>
+                  <TableCell><b>Average</b></TableCell>
+                  <TableCell align="right">
+                    {(() => {
+                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.pessimistic) : null).filter(v => v !== null && !isNaN(v));
+                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                    })()}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(() => {
+                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.realistic) : null).filter(v => v !== null && !isNaN(v));
+                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                    })()}
+                  </TableCell>
+                  <TableCell align="right">
+                    {(() => {
+                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.optimistic) : null).filter(v => v !== null && !isNaN(v));
+                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                    })()}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Typography variant="body2" sx={{ mt: 3, color: '#64748b' }}>
+            <b>How is Avg Yearly ROI calculated?</b><br/>
+            The Avg Yearly ROI shown on your portfolio is the average of the <b>realistic</b> ROI values across all your investments. Each investment's realistic ROI is estimated based on its type and data. The average is calculated as the sum of all realistic ROIs divided by the number of investments.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRoiModalOpen(false)} variant="contained" color="primary">Close</Button>
+        </DialogActions>
+      </Dialog>
       <Footer />
     </Box>
   );

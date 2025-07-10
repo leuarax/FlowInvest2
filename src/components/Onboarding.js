@@ -35,6 +35,7 @@ const Onboarding = () => {
     experience: '',
     riskTolerance: '',
     referralSource: '',
+    referralOther: '', // <-- add this line
     interests: [],
     primaryGoal: '',
     screenshotFile: null,
@@ -84,9 +85,9 @@ const Onboarding = () => {
   ];
 
   const referralOptions = [
-    { value: 'social_media', label: 'Social Media' },
+    { value: 'instagram', label: 'Instagram' },
+    { value: 'tiktok', label: 'TikTok' },
     { value: 'friend_recommendation', label: 'Friend Recommendation' },
-    { value: 'online_ad', label: 'Online Advertisement' },
     { value: 'search_engine', label: 'Search Engine' },
     { value: 'blog_article', label: 'Blog/Article' },
     { value: 'podcast', label: 'Podcast' },
@@ -190,6 +191,8 @@ const Onboarding = () => {
           for (const inv of recognizedInvestments) {
             await saveInvestment(userId, inv);
           }
+          // Store expected investment count in localStorage
+          localStorage.setItem('expectedInvestmentCount', recognizedInvestments.length.toString());
         }
       }
       // 3. Call /api/analyze-portfolio with the recognized investments and preview=true
@@ -454,6 +457,16 @@ const Onboarding = () => {
                   </MenuItem>
                 ))}
               </Select>
+              {formData.referralSource === 'other' && (
+                <TextField
+                  fullWidth
+                  sx={{ mt: 2 }}
+                  label="Please specify"
+                  name="referralOther"
+                  value={formData.referralOther}
+                  onChange={handleInputChange}
+                />
+              )}
               <FormHelperText>This helps us improve our marketing and reach more investors</FormHelperText>
             </FormControl>
           </Box>
@@ -527,40 +540,43 @@ const Onboarding = () => {
       case 5:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 2, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
               What you'll get with FlowInvest
             </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
-              Here's what you can expect from your personalized investment experience:
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mb: 4 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'row', sm: 'row' },
+                flexWrap: 'wrap',
+                gap: 1,
+                mb: 2,
+                justifyContent: 'center',
+                alignItems: 'stretch',
+              }}
+            >
               {benefits.map((benefit, index) => (
                 <Paper
                   key={index}
                   sx={{
-                    p: 3,
+                    p: 1.2,
+                    minWidth: 0,
+                    flex: '1 1 100px',
+                    maxWidth: 120,
                     background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(102, 126, 234, 0.2)',
-                    borderRadius: '16px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.15)'
-                    }
+                    border: '1px solid rgba(102, 126, 234, 0.15)',
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <Typography variant="h3" sx={{ mr: 2 }}>
-                      {benefit.icon}
-                    </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                      {benefit.title}
-                    </Typography>
-                  </Box>
-                  <Typography variant="body1" sx={{ color: '#64748b' }}>
-                    {benefit.description}
+                  <Typography variant="h3" sx={{ fontSize: '2rem', mb: 0.5 }}>
+                    {benefit.icon}
+                  </Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', textAlign: 'center', mb: 0.5 }}>
+                    {benefit.title}
                   </Typography>
                 </Paper>
               ))}
@@ -718,7 +734,7 @@ const Onboarding = () => {
                       Grade: {formData.portfolioAnalysis.grade}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#64748b' }}>
-                      Risk Score: {formData.portfolioAnalysis.riskScore !== undefined && formData.portfolioAnalysis.riskScore !== null ? formData.portfolioAnalysis.riskScore : 'N/A'}
+                      Risk Score: {formData.portfolioAnalysis.riskScore !== undefined && formData.portfolioAnalysis.riskScore !== null ? `${formData.portfolioAnalysis.riskScore}/10` : 'N/A'}
                     </Typography>
                   </Box>
                 </Box>
@@ -840,7 +856,7 @@ const Onboarding = () => {
                 variant="contained"
                 onClick={analyzeScreenshot}
                 disabled={formData.analysisLoading}
-                startIcon={formData.analysisLoading ? <CircularProgress size={20} /> : <AnalyticsIcon />}
+                startIcon={!formData.analysisLoading ? <AnalyticsIcon /> : null}
                 sx={{
                   textTransform: 'none',
                   borderRadius: '12px',

@@ -19,7 +19,7 @@ import {
   savePortfolioAnalysis,
   deletePortfolioAnalysis // <-- add this import
 } from '../utils/firebase';
-import { deleteUser, updateEmail as firebaseUpdateEmail, sendEmailVerification } from 'firebase/auth';
+import { deleteUser, updateEmail as firebaseUpdateEmail, sendEmailVerification, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { getPortfolioAnalysis } from '../utils/openai';
 
 const AuthContext = createContext();
@@ -74,7 +74,6 @@ export const AuthProvider = ({ children }) => {
             const { analysis } = await getPortfolioAnalysisAndHistory(user.uid);
             let needsUpdate = false;
             let lastAnalysisDate = null;
-            let lastLoginDate = new Date();
             if (analysis && analysis.updatedAt) {
               lastAnalysisDate = new Date(analysis.updatedAt.seconds ? analysis.updatedAt.seconds * 1000 : analysis.updatedAt);
             }
@@ -246,36 +245,6 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     } catch (error) {
       console.error('Sign out error:', error);
-      return { error };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (!user) {
-      return { error: new Error('User not authenticated') };
-    }
-
-    try {
-      setLoading(true);
-      // Delete user profile and all investments
-      const { error: profileError } = await deleteUserProfile(user.uid);
-      if (profileError) {
-        console.error('Error deleting user profile:', profileError);
-      }
-      // Delete portfolio analysis
-      const { error: analysisError } = await deletePortfolioAnalysis(user.uid);
-      if (analysisError) {
-        console.error('Error deleting portfolio analysis:', analysisError);
-      }
-      // Delete the Firebase Auth user
-      await deleteUser(user);
-      setUser(null);
-      setUserProfile(null);
-      return { error: null };
-    } catch (error) {
-      console.error('Delete account error:', error);
       return { error };
     } finally {
       setLoading(false);
@@ -481,6 +450,64 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Add a helper to reauthenticate the user
+  const reauthenticateUser = async (email, password) => {
+    if (!user) return { error: new Error('User not authenticated') };
+    try {
+      const credential = EmailAuthProvider.credential(email, password);
+      await reauthenticateWithCredential(user, credential);
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const deleteAccount = async (reauthData = null) => {
+    if (!user) {
+      return { error: new Error('User not authenticated') };
+    }
+    try {
+      setLoading(true);
+      // Delete user profile and all investments
+      const { error: profileError } = await deleteUserProfile(user.uid);
+      if (profileError) {
+        console.error('Error deleting user profile:', profileError);
+      }
+      // Delete portfolio analysis
+      const { error: analysisError } = await deletePortfolioAnalysis(user.uid);
+      if (analysisError) {
+        console.error('Error deleting portfolio analysis:', analysisError);
+      }
+      // Try to delete the Firebase Auth user
+      try {
+        await deleteUser(user);
+      } catch (error) {
+        if (error.code === 'auth/requires-recent-login' && reauthData) {
+          // Try re-authenticating and retrying
+          const { error: reauthError } = await reauthenticateUser(reauthData.email, reauthData.password);
+          if (!reauthError) {
+            await deleteUser(user);
+          } else {
+            return { error: reauthError };
+          }
+        } else if (error.code === 'auth/requires-recent-login') {
+          // Signal to UI that re-auth is needed
+          return { error: { code: 'auth/requires-recent-login' } };
+        } else {
+          throw error;
+        }
+      }
+      setUser(null);
+      setUserProfile(null);
+      return { error: null };
+    } catch (error) {
+      console.error('Delete account error:', error);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const value = {
     user,
     userProfile,
@@ -502,6 +529,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updateEmail,
     sendEmailVerificationToNewEmail,
+    reauthenticateUser,
     setPortfolioAnalysis, // <-- add this line
   };
 

@@ -35,7 +35,11 @@ console.log('OpenAI client initialized');
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.diskStorage({
-    destination: '/tmp',
+    destination: (req, file, cb) => {
+      // Use a cross-platform temp directory
+      const os = require('os');
+      cb(null, os.tmpdir());
+    },
     filename: (req, file, cb) => {
       cb(null, `${uuidv4()}-${file.originalname}`);
     },

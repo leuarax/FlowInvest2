@@ -18,8 +18,10 @@ const port = process.env.PORT || 3001;
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://flowinvest2.vercel.app' 
-    : 'http://localhost:3000',
-  credentials: true
+    : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -45,6 +47,13 @@ app.post('/api/stress-test', (req, res, next) => {
 
 // Batch portfolio analysis endpoint
 app.post('/api/analyze-portfolio', (req, res, next) => {
+  console.log('Received analyze-portfolio request:', {
+    method: req.method,
+    url: req.url,
+    headers: req.headers,
+    body: req.body,
+    files: req.files
+  });
   analyzePortfolioHandler(req, res).catch(next);
 });
 
@@ -58,6 +67,12 @@ app.post('/api/screenshot', ...analyzeScreenshot);
 app.post('/api/test-json', (req, res) => {
   console.log('Test JSON body:', req.body);
   res.json({ received: req.body });
+});
+
+// Simple test endpoint
+app.get('/api/test', (req, res) => {
+  console.log('Test endpoint hit');
+  res.json({ message: 'Server is running!', timestamp: new Date().toISOString() });
 });
 
 // Serve static files from the React app

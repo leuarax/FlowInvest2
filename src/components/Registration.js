@@ -230,6 +230,10 @@ const Registration = () => {
           } else {
             console.log('No investments found in portfolio analysis');
           }
+          // Store expected investment count in localStorage
+          if (parsedOnboardingData && parsedOnboardingData.portfolioAnalysis && Array.isArray(parsedOnboardingData.portfolioAnalysis.investments)) {
+            localStorage.setItem('expectedInvestmentCount', parsedOnboardingData.portfolioAnalysis.investments.length.toString());
+          }
           
           try {
             // Get the full analysis for the user's portfolio

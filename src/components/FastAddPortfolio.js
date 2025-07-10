@@ -27,12 +27,13 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
-export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
+export default function FastAddPortfolio({ open, onClose, onAddInvestments, userProfile }) {
   const [selected, setSelected] = useState([]);
   const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
 
@@ -60,6 +61,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     setInvestments([]);
     setSelected([]);
     setError('');
+    setSuccess('');
     // Reset the file input value to allow selecting the same file again
     e.target.value = null;
   };
@@ -69,14 +71,27 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
 
     setLoading(true);
     setError('');
+    setSuccess('');
 
     try {
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append('screenshots', file);
-      });
+      // Process each file individually since the screenshot endpoint expects single files
+      const allInvestments = [];
+      
+      const makeRequest = async (url, file) => {
+        const formData = new FormData();
+        
+        // Add single file with correct field name
+        formData.append('screenshot', file);
+        
+        // Add user profile for personalized analysis
+        console.log('User profile for analysis:', userProfile);
+        if (userProfile) {
+          formData.append('userProfile', JSON.stringify(userProfile));
+          console.log('Added user profile to form data');
+        } else {
+          console.log('No user profile available for analysis');
+        }
 
-      const makeRequest = async (url) => {
         const res = await fetch(url, {
           method: 'POST',
           body: formData,
@@ -94,23 +109,94 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         }
       };
 
-      let data;
-      try {
-        data = await makeRequest('http://localhost:3001/api/analyze-portfolio');
-      } catch (err) {
-        console.log('Local server failed, trying production URL...', err);
-        data = await makeRequest('/api/analyze-portfolio');
+      // Step 1: Extract investments from screenshots
+      for (const file of files) {
+        console.log('Processing file:', file.name);
+        
+        let fileData;
+        try {
+          console.log('Trying local server at http://localhost:3001/api/screenshot...');
+          fileData = await makeRequest('http://localhost:3001/api/screenshot', file);
+        } catch (err) {
+          console.log('Local server failed, trying production URL...', err);
+          try {
+            fileData = await makeRequest('/api/screenshot', file);
+          } catch (prodErr) {
+            console.error('Both local and production endpoints failed for file:', file.name, { local: err.message, production: prodErr.message });
+            throw new Error(`API endpoints unavailable for file ${file.name}. Please ensure the local server is running (npm run server) or try again later. Local error: ${err.message}`);
+          }
+        }
+
+        // The screenshot endpoint returns investments directly (not wrapped in data property)
+        if (fileData && Array.isArray(fileData)) {
+          allInvestments.push(...fileData);
+          console.log(`Added ${fileData.length} investments from file ${file.name}`);
+        } else {
+          console.warn(`No valid investments found in file ${file.name}:`, fileData);
+        }
       }
 
-      if (!data || !Array.isArray(data.data)) {
-        console.error('Invalid API response structure:', data);
-        throw new Error('API response did not contain an array of investments.');
+      if (allInvestments.length === 0) {
+        throw new Error('No valid investments found in any of the uploaded files.');
       }
 
-      const processedInvestments = data.data;
+      console.log('Extracted investments:', allInvestments);
 
-      setInvestments(processedInvestments);
-      setSelected(processedInvestments.map(() => true));
+      // Use correct API base for local vs production
+      const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+      // Step 2: Analyze investments with user profile using onboarding logic
+      console.log('Analyzing investments with user profile using onboarding logic...');
+      const analyzedInvestments = [];
+      for (const investment of allInvestments) {
+        // Only keep the basic fields for analysis, and default date to today if missing
+        const { name, type, amount, date } = investment;
+        const cleanInvestment = {
+          name,
+          type,
+          amount,
+          date: date || new Date().toISOString().split('T')[0]
+        };
+        // Validation: skip if missing name/type or amount is not positive
+        if (!cleanInvestment.name || !cleanInvestment.type || !cleanInvestment.amount || cleanInvestment.amount <= 0) {
+          console.warn('Skipping invalid investment:', cleanInvestment);
+          continue;
+        }
+        // Log what is being sent to /api/investment
+        console.log('Sending to /api/investment:', cleanInvestment, userProfile);
+        try {
+          const response = await fetch(`${apiBase}/api/investment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              investmentData: cleanInvestment,
+              userProfile: userProfile
+            })
+          });
+          if (!response.ok) {
+            throw new Error(`Analysis failed for ${cleanInvestment.name}: ${response.status}`);
+          }
+          const analysis = await response.json();
+          analyzedInvestments.push({ ...cleanInvestment, ...analysis });
+        } catch (err) {
+          console.error('Error analyzing investment:', cleanInvestment.name, err);
+          analyzedInvestments.push({
+            ...cleanInvestment,
+            roiEstimate: 0,
+            riskScore: 5,
+            grade: 'B',
+            explanation: 'Analysis could not be completed for this investment.',
+            riskExplanation: 'Default risk assessment applied.',
+            roiScenarios: {
+              pessimistic: 0,
+              realistic: 0,
+              optimistic: 0
+            }
+          });
+        }
+      }
+      console.log('Analyzed investments:', analyzedInvestments);
+      setInvestments(analyzedInvestments);
+      setSelected(analyzedInvestments.map(() => true));
 
     } catch (err) {
       console.error('Error analyzing portfolio:', err);
@@ -138,8 +224,25 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     setAddLoading(true);
     try {
       const selectedInvestments = investments.filter((_, index) => selected[index]);
+      if (selectedInvestments.length === 0) {
+        setError('Please select at least one investment to add.');
+        return;
+      }
+      
+      console.log('Adding selected investments:', selectedInvestments);
       await onAddInvestments(selectedInvestments);
-      handleClose();
+      
+      // Show success message
+      setSuccess(`Successfully added ${selectedInvestments.length} investments to your portfolio!`);
+      setError('');
+      
+      // Close after a short delay to show the success message
+      setTimeout(() => {
+        handleClose();
+      }, 2000);
+    } catch (error) {
+      console.error('Error adding investments:', error);
+      setError(`Failed to add investments: ${error.message}`);
     } finally {
       setAddLoading(false);
     }
@@ -151,6 +254,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
     setInvestments([]);
     setSelected([]);
     setError('');
+    setSuccess('');
   };
 
   const handleClose = () => {
@@ -214,9 +318,9 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
         <Box sx={{ 
           textAlign: 'center', 
           p: previews.length === 0 ? 6 : 3,
-          background: previews.length === 0 ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'transparent',
+          background: previews.length === 0 ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'rgba(248, 250, 252, 0.8)',
           borderRadius: '16px',
-          border: previews.length === 0 ? '2px dashed rgba(102, 126, 234, 0.3)' : 'none',
+          border: previews.length === 0 ? '2px dashed rgba(102, 126, 234, 0.3)' : '1px solid rgba(226, 232, 240, 0.8)',
           mb: 3,
           mt: 2
         }}>
@@ -224,6 +328,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
             variant="contained"
             component="label"
             startIcon={<CloudUploadIcon />}
+            disabled={loading}
             sx={{
               background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               borderRadius: '16px',
@@ -237,10 +342,15 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
                 transform: 'translateY(-2px)',
                 boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
               },
+              '&:disabled': {
+                background: 'rgba(100, 116, 139, 0.3)',
+                transform: 'none',
+                boxShadow: 'none'
+              },
               transition: 'all 0.3s ease'
             }}
           >
-            Upload Screenshot(s)
+            {previews.length === 0 ? 'Upload Screenshot(s)' : 'Add More Screenshots'}
             <input 
               type="file" 
               multiple
@@ -269,6 +379,12 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
           {previews.length === 0 && (
             <Typography variant="body1" sx={{ color: '#64748b', lineHeight: 1.6 }}>
               Upload one or more screenshots of your portfolio (e.g., from your broker) showing the name and amount of each asset.
+            </Typography>
+          )}
+          
+          {previews.length > 0 && (
+            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.6 }}>
+              You can add more screenshots or click "Analyze Portfolio" to process your current uploads.
             </Typography>
           )}
         </Box>
@@ -404,6 +520,24 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments }) {
             </Typography>
             <Typography variant="body2" sx={{ color: '#7f1d1d', mt: 1 }}>
               {error}
+            </Typography>
+          </Paper>
+        )}
+
+        {/* Success State */}
+        {success && (
+          <Paper sx={{
+            p: 3,
+            mb: 3,
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '12px'
+          }}>
+            <Typography variant="body1" sx={{ color: '#059669', fontWeight: 600 }}>
+              ✅ Success
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#065f46', mt: 1 }}>
+              {success}
             </Typography>
           </Paper>
         )}

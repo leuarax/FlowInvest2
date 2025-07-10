@@ -10,6 +10,8 @@ const openai = new OpenAI({
 
 module.exports = async (req, res) => {
   console.log('Received request to analyze portfolio screenshots');
+  console.log('Request body keys:', Object.keys(req.body || {}));
+  console.log('User profile in request:', req.body?.userProfile);
   
   // Accept both 'screenshot' (single file) and 'screenshots' (multiple files)
   let files = [];
@@ -155,9 +157,164 @@ Return a JSON array of investment objects. Only include data that is clearly vis
     if (allInvestments.length === 0) {
       throw new Error('No valid investments found in any of the uploaded images');
     }
+
+    // Generate AI analysis for each investment to add missing fields
+    console.log('Generating AI analysis for extracted investments...');
+    console.log('Number of investments to analyze:', allInvestments.length);
+    const enhancedInvestments = [];
     
-    // Return the investments wrapped in a data property to match expected format
-    return res.json({ data: allInvestments });
+    // Get user profile from request body if available (for personalized analysis)
+    let userProfile = null;
+    if (req.body && req.body.userProfile) {
+      try {
+        userProfile = JSON.parse(req.body.userProfile);
+      } catch (e) {
+        console.log('Could not parse user profile, using default analysis');
+      }
+    }
+    
+    // Default user profile if not provided (for consistent analysis)
+    const defaultUserProfile = {
+      experience: 'intermediate',
+      riskTolerance: 'moderate',
+      interests: ['Stocks', 'ETFs'],
+      primaryGoal: 'Long-term growth'
+    };
+    
+    const analysisUserProfile = userProfile || defaultUserProfile;
+    
+    for (const investment of allInvestments) {
+      console.log('Starting analysis for investment:', investment.name);
+      try {
+        // Use the exact same analysis method as api/investment.js
+        const prompt = `
+          As an expert financial analyst, you are analyzing an investment for a client.
+
+          You will be given the user's profile and the investment details. Use this information as follows:
+
+          1.  **Grade**: Determine the investment 'grade' (e.g., A+, B-, C) by comparing the investment to the user's profile (their experience, risk tolerance, and interests). A grade of 'A' means it's a perfect match for them, while a grade of 'F' means it's a very poor fit.
+          2.  **Risk, ROI, and Explanation**: The rest of your analysis (riskScore, roiEstimate, explanation) should be based *only* on the investment's own characteristics, disregarding the user's profile.
+          3.  **Explanation Tone**: In your explanation, address the user directly.
+
+          User Profile:
+          - Experience: ${analysisUserProfile.experience}
+          - Risk Tolerance: ${analysisUserProfile.riskTolerance}
+          - Interests: ${Array.isArray(analysisUserProfile.interests) ? analysisUserProfile.interests.join(', ') : analysisUserProfile.interests}
+          - Investment Goal: ${analysisUserProfile.primaryGoal}
+
+          Investment Details:
+          - Type: ${investment.type}
+          - Name: ${investment.name}
+          - Amount: $${investment.amount}
+          - Start Date: ${investment.date}
+
+          Please provide the following in a single JSON object:
+          - "grade": The letter grade based on the match with the user's profile.
+          - "riskScore": A numerical risk score from 1 (very low risk) to 10 (very high risk). Your calculation must follow these rules:
+              - **Asset Class**: Bonds, Real Estate, and Commodities should generally receive lower risk scores than equities.
+              - **Company Maturity**: Well-established, large-cap companies (e.g., 'blue-chip' stocks) should have lower risk scores than new startups or highly volatile assets.
+          - "riskExplanation": A brief, one-sentence explanation for the assigned risk score, justifying the number based on the asset class or company maturity.
+          - "roiScenarios": A JSON object containing three ROI estimates for different market conditions: "pessimistic", "realistic", and "optimistic".
+          - "roiEstimate": A numerical value representing the average of the three ROI scenarios, calculated as (pessimistic + realistic + optimistic) / 3. Do not include a '%' sign.
+          - "explanation": A detailed, multi-sentence explanation of your overall analysis. Address the user directly and explain your reasoning for the grade and ROI.
+        `;
+
+        const analysisResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: "You are a senior financial analyst that provides detailed investment analysis." },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+          response_format: { type: "json_object" }
+        });
+
+        const analysisContent = analysisResponse?.choices?.[0]?.message?.content || '{}';
+        let analysis;
+        try {
+          analysis = JSON.parse(analysisContent);
+          
+          // Ensure all required fields are present (same validation as api/investment.js)
+          if (!analysis.grade || !analysis.riskScore || !analysis.roiEstimate || !analysis.explanation) {
+            throw new Error('Incomplete analysis response from AI');
+          }
+          
+          // Ensure riskScore is a number between 1-10
+          analysis.riskScore = Math.max(1, Math.min(10, Number(analysis.riskScore) || 5));
+          
+          // Ensure roiEstimate is a number, parsing it robustly
+          let roiEstimate = 0;
+          if (typeof analysis.roiEstimate === 'string') {
+            // Strip any non-numeric characters (like '%') and parse
+            roiEstimate = parseFloat(analysis.roiEstimate.replace(/[^0-9.-]+/g, ""));
+          } else if (typeof analysis.roiEstimate === 'number') {
+            roiEstimate = analysis.roiEstimate;
+          }
+          analysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
+          
+        } catch (parseError) {
+          console.error('Error parsing analysis response:', parseError);
+          throw new Error('Failed to parse analysis response');
+        }
+
+        // Merge the analysis with the investment data (same structure as onboarding)
+        const enhancedInvestment = {
+          ...investment,
+          roiEstimate: analysis.roiEstimate,
+          riskScore: analysis.riskScore,
+          grade: analysis.grade,
+          explanation: analysis.explanation,
+          riskExplanation: analysis.riskExplanation,
+          roiScenarios: analysis.roiScenarios || {
+            pessimistic: (analysis.roiEstimate || 8.5) * 0.8,
+            realistic: analysis.roiEstimate || 8.5,
+            optimistic: (analysis.roiEstimate || 8.5) * 1.2
+          }
+        };
+
+        enhancedInvestments.push(enhancedInvestment);
+        console.log('Enhanced investment:', enhancedInvestment.name, 'with analysis');
+        console.log('Analysis details:', {
+          roiEstimate: enhancedInvestment.roiEstimate,
+          riskScore: enhancedInvestment.riskScore,
+          grade: enhancedInvestment.grade,
+          hasExplanation: !!enhancedInvestment.explanation,
+          hasRoiScenarios: !!enhancedInvestment.roiScenarios
+        });
+
+      } catch (analysisError) {
+        console.error('Error analyzing investment:', investment.name, analysisError);
+        console.error('Analysis error details:', analysisError.message);
+        // Keep the investment with default values if analysis fails (same as onboarding)
+        const investmentWithBasicAnalysis = {
+          ...investment,
+          grade: 'B',
+          riskScore: 5,
+          roiEstimate: 8.5,
+          roiScenarios: {
+            pessimistic: 6.8,
+            realistic: 8.5,
+            optimistic: 10.2
+          },
+          explanation: 'Investment from Fast Add Portfolio (basic analysis)'
+        };
+        enhancedInvestments.push(investmentWithBasicAnalysis);
+      }
+    }
+    
+    // Return the enhanced investments wrapped in a data property to match expected format
+    console.log('Final enhanced investments count:', enhancedInvestments.length);
+    console.log('Final enhanced investments:', enhancedInvestments.map(inv => ({
+      name: inv.name,
+      roiEstimate: inv.roiEstimate,
+      riskScore: inv.riskScore,
+      grade: inv.grade,
+      hasExplanation: !!inv.explanation,
+      hasRoiScenarios: !!inv.roiScenarios
+    })));
+    console.log('Sending response with data property');
+    return res.json({ data: enhancedInvestments });
     
   } catch (error) {
     console.error('Error in batch analysis:', error);
