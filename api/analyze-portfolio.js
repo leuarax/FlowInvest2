@@ -144,12 +144,12 @@ module.exports = async function handler(req, res) {
         // Call OpenAI to generate preview analysis, grade, and riskScore
         let aiPreview;
         try {
-          const previewPrompt = `Given the following investments and user profile, return a JSON object with: grade (string), riskScore (number), and analysis (string, 3 lines max, preview only).\n\nInvestments: ${JSON.stringify(investments)}\nUser Profile: ${userProfile ? JSON.stringify(userProfile) : '{}'}\n\nRespond with only the JSON object, no markdown or extra text.`;
+          const previewPrompt = `Given the following investments and user profile, return a JSON object with: grade (string), riskScore (number), and analysis (string with bullet points, 3-5 key points max, preview only).\n\nInvestments: ${JSON.stringify(investments)}\nUser Profile: ${userProfile ? JSON.stringify(userProfile) : '{}'}\n\nProvide analysis as bullet points that quickly tell the user the main points about their portfolio. Use format like:\n• Point 1\n• Point 2\n• Point 3\n\nRespond with only the JSON object, no markdown or extra text.`;
           const aiResponse = await openai.chat.completions.create({
             model: "gpt-4o",
             response_format: { type: "json_object" },
             messages: [
-              { role: "system", content: "You are a helpful assistant that analyzes investment portfolios and provides a preview analysis." },
+              { role: "system", content: "You are a helpful assistant that analyzes investment portfolios and provides concise bullet-point analysis." },
               { role: "user", content: previewPrompt }
             ],
             max_tokens: 500,
@@ -292,25 +292,56 @@ module.exports = async function handler(req, res) {
 
     console.log('Sending successful response with', cleanedInvestments.length, 'investments');
 
-    // After generating analysisText and grade
-    const analysisText = `Your portfolio is well diversified.\nConsider rebalancing your tech stocks.\nCrypto allocation is high risk.\nLong-term outlook is positive.\nReview your bond holdings.`;
-    const grade = 'B+';
-    let riskScore;
-    if (investments && investments.length > 0 && investments[0].riskScore !== undefined) {
-      riskScore = investments[0].riskScore;
+    // Generate AI analysis for the full portfolio
+    let analysisText, grade, riskScore;
+    let aiAnalysis = null;
+    let analysisContent = '';
+    let attempts = 0;
+    const maxAttempts = 3;
+    while (attempts < maxAttempts) {
+      try {
+        const analysisPrompt = `Analyze this investment portfolio and provide a JSON response with: grade (string), riskScore (number 1-10), and analysis (string with bullet points).\n\nInvestments: ${JSON.stringify(cleanedInvestments)}\n\nProvide analysis as bullet points that quickly tell the user the main points about their portfolio. Use format like:\n• Point 1\n• Point 2\n• Point 3\n\nFocus on key insights about diversification, risk, allocation, and recommendations. Respond ONLY with bullet points in the analysis field.`;
+        const aiAnalysisResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: "You are a helpful assistant that analyzes investment portfolios and provides concise bullet-point analysis. Only use bullet points in the analysis field." },
+            { role: "user", content: analysisPrompt }
+          ],
+          max_tokens: 800,
+          temperature: 0.3,
+        });
+        analysisContent = aiAnalysisResponse?.choices?.[0]?.message?.content || '{}';
+        aiAnalysis = JSON.parse(analysisContent);
+        analysisText = aiAnalysis.analysis || '';
+        grade = aiAnalysis.grade || 'B';
+        riskScore = aiAnalysis.riskScore || 5;
+        // Log the raw analysis field and bullet point check
+        console.log(`AI analysis attempt #${attempts + 1}:`);
+        console.log('Raw analysis field:', JSON.stringify(analysisText));
+        const hasBullets = /^\s*[•\-]/m.test(analysisText);
+        console.log('Contains bullet points:', hasBullets);
+        if (hasBullets) {
+          break;
+        }
+      } catch (analysisError) {
+        console.error('AI analysis error:', analysisError);
+        if (attempts === maxAttempts - 1) {
+          analysisText = '• Portfolio analysis completed\n• Review your investments regularly\n• Consider professional advice';
+          grade = 'B';
+          riskScore = 5;
+        }
+      }
+      attempts++;
     }
-    // The original code had a return here, but the new_code_to_apply_changes_from
-    // had a return; // This will be replaced by the actual preview analysis return
-    // This means the original code's return for full analysis is now effectively removed
-    // by the new_code_to_apply_changes_from.
-    // The new_code_to_apply_changes_from only handled the preview case.
-    // The full analysis case is now handled by the original code's return.
-    // So, the original code's return for full analysis is preserved.
+    // Ensure riskScore is within valid range
+    riskScore = Math.max(1, Math.min(10, Number(riskScore)));
     return res.json({
       success: true,
       data: cleanedInvestments,
       grade,
       analysis: analysisText,
+      riskScore,
       timestamp: new Date().toISOString()
     });
 

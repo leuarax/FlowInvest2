@@ -2,16 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  Container, Box, Typography, TextField, Button, Grid, Paper, CircularProgress, Alert,
-  Chip, Card, CardContent, Fade, useTheme, useMediaQuery
+  Container, Box, Typography, TextField, Button, Grid, Paper, CircularProgress,
+  Card, CardContent, Fade, useTheme, useMediaQuery
 } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import SaveIcon from '@mui/icons-material/Save';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import SecurityIcon from '@mui/icons-material/Security';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import EuroIcon from '@mui/icons-material/Euro';
 import Footer from './Footer';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
@@ -33,7 +29,6 @@ const AddRealEstate = () => {
   const { saveInvestment } = useAuth();
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [analysis, setAnalysis] = useState(null);
   const [step, setStep] = useState(1); // 1: Location, 2: Property, 3: Financial, 4: Financing, 5: Analysis
   const [form, setForm] = useState({
@@ -73,7 +68,6 @@ const AddRealEstate = () => {
 
   const handleAnalyze = async () => {
     setLoading(true);
-    setError(null);
     setAnalysis(null);
     try {
       let res;
@@ -85,11 +79,20 @@ const AddRealEstate = () => {
         });
       } catch (err) {
         console.log('Local server failed, trying production URL...', err);
-        res = await fetch('/api/analyze-real-estate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
-        });
+        try {
+          res = await fetch('/api/analyze-real-estate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+          });
+        } catch (prodErr) {
+          console.log('Production URL failed, trying Vercel fallback...', prodErr);
+          res = await fetch('https://flow-invest2-hpr3.vercel.app/api/analyze-real-estate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(form),
+          });
+        }
       }
       
       if (!res.ok) {
@@ -99,7 +102,7 @@ const AddRealEstate = () => {
       const result = await res.json();
       setAnalysis(result);
     } catch (err) {
-      setError(err.message || 'An unknown error occurred during analysis.');
+      console.error('Analysis error:', err.message || 'An unknown error occurred during analysis.');
     } finally {
       setLoading(false);
     }
@@ -126,13 +129,12 @@ const AddRealEstate = () => {
       };
       const { error } = await saveInvestment(newInvestment);
       if (error) {
-        setError('Failed to save investment: ' + error);
+        console.error('Failed to save investment:', error);
         return;
       }
       navigate('/dashboard');
     } catch (error) {
       console.error('Error saving investment:', error);
-      setError('Failed to save investment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -176,7 +178,7 @@ const AddRealEstate = () => {
     <Box sx={{
       minHeight: '100vh',
       minWidth: '100vw',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      backgroundColor: '#ffffff',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -185,77 +187,323 @@ const AddRealEstate = () => {
       py: 0,
       px: 0
     }}>
-      {/* Header Section: Always show at the top */}
-      <Box sx={{ textAlign: 'center', mb: 4, mt: { xs: 12, sm: 6 } }}>
-        <Typography 
-          variant="h3" 
-          sx={{ 
-            color: 'white', 
-            fontWeight: 700, 
-            mb: 2,
-            textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-          }}
-        >
-          FlowInvest
-        </Typography>
-        <Typography 
-          variant="h6" 
-          sx={{ 
-            color: 'rgba(255,255,255,0.9)', 
-            fontWeight: 400,
-            mb: 1
-          }}
-        >
-          Add Real Estate Investment
-        </Typography>
-      </Box>
-      {/* Back to Dashboard Button */}
-      <Box sx={{ position: 'absolute', top: 16, left: 16, zIndex: 10 }}>
-        <Button
-          onClick={() => navigate('/dashboard')}
-          startIcon={<ArrowBackIcon />}
-          variant="outlined"
-          sx={{
-            color: 'white',
-            borderColor: 'white',
-            background: 'rgba(255,255,255,0.08)',
-            borderRadius: '12px',
-            px: { xs: 1.5, sm: 3 },
-            py: { xs: 0.5, sm: 1.5 },
-            fontWeight: 600,
-            textTransform: 'none',
-            boxShadow: 2,
-            fontSize: { xs: '0.95rem', sm: '1rem' },
-            minWidth: { xs: 'unset', sm: '120px' },
-            '&:hover': {
-              background: 'rgba(255,255,255,0.18)',
-              borderColor: 'white',
-              color: '#764ba2',
-            },
-            transition: 'all 0.3s ease'
-          }}
-        >
-          Back to Dashboard
-        </Button>
-      </Box>
+      {/* Header */}
+      <Container maxWidth="lg" sx={{ py: 3, px: 2, width: '100%' }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          mb: 4,
+          pb: 2,
+          borderBottom: '1px solid #E5E7EB'
+        }}>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              color: '#1F2937',
+              fontSize: { xs: '1.5rem', sm: '2rem' },
+              fontWeight: 700,
+              letterSpacing: '-0.025em'
+            }}
+          >
+            FlowInvest
+          </Typography>
+          
+          <Button
+            onClick={() => navigate('/dashboard')}
+            startIcon={<ArrowBackIcon />}
+            sx={{
+              backgroundColor: '#F9FAFB',
+              border: '1px solid #E5E7EB',
+              borderRadius: '12px',
+              px: 2,
+              py: 1,
+              color: '#6B7280',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': {
+                backgroundColor: '#F3F4F6',
+                borderColor: '#D1D5DB'
+              }
+            }}
+          >
+            Dashboard
+          </Button>
+        </Box>
+      </Container>
+
       <Container maxWidth="lg" sx={{ flex: 1, py: 4 }}>
+        {/* AI Analysis Results - Moved to top */}
+        {(step === 5 && analysis) && (
+          <Box sx={{ mb: 4 }}>
+            <Paper sx={{ 
+              backgroundColor: '#ffffff',
+              border: '1px solid #E5E7EB',
+              borderRadius: '16px',
+              p: 3,
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+            }}>
+              <Box sx={{ mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <AnalyticsIcon sx={{ fontSize: 24, color: '#8B5CF6', mr: 1 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', fontSize: '1.125rem' }}>
+                    AI Analysis Results
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
+                  Comprehensive real estate investment analysis powered by AI
+                </Typography>
+              </Box>
+              <Fade in={!!analysis}>
+                <Box>
+                  {/* Analysis Cards */}
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    {/* Grade Card */}
+                    <Grid item xs={12} sm={6}>
+                      <Card sx={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        p: 2,
+                        height: '100%'
+                      }}>
+                        <CardContent sx={{ pb: 0 }}>
+                          <Typography 
+                            variant="h4" 
+                            sx={{ 
+                              color: getGradeColor(analysis.grade), 
+                              fontWeight: 700,
+                              mb: 1
+                            }}
+                          >
+                            {analysis.grade || '-'}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 500, fontSize: '0.875rem' }}>
+                            Investment Grade
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    {/* Risk Analysis Card */}
+                    <Grid item xs={12} sm={6}>
+                      <Card sx={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        p: 2,
+                        height: '100%'
+                      }}>
+                        <CardContent sx={{ pb: 0 }}>
+                          <Typography variant="h4" sx={{ fontWeight: 700, color: '#1F2937', mb: 1 }}>
+                            {analysis.riskScore || 'N/A'}/10
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 500, fontSize: '0.875rem' }}>
+                            Risk Score
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    {/* ROI Scenarios Card */}
+                    <Grid item xs={12}>
+                      <Card sx={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        p: 2,
+                      }}>
+                        <CardContent>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', mb: 2, fontSize: '1rem' }}>
+                            ROI Scenarios
+                          </Typography>
+                          {analysis.roiScenarios ? (
+                            <Grid container spacing={2}>
+                              <Grid item xs={4}>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#EF4444', fontSize: '0.875rem' }}>
+                                    {analysis.roiScenarios.pessimistic}%
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                    Pessimistic
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                              <Grid item xs={4}>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#8B5CF6', fontSize: '0.875rem' }}>
+                                    {analysis.roiScenarios.realistic}%
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                    Realistic
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                              <Grid item xs={4}>
+                                <Box sx={{ textAlign: 'center' }}>
+                                  <Typography variant="body1" sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>
+                                    {analysis.roiScenarios.optimistic}%
+                                  </Typography>
+                                  <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                    Optimistic
+                                  </Typography>
+                                </Box>
+                              </Grid>
+                            </Grid>
+                          ) : (
+                            <Typography sx={{ color: '#6B7280', fontSize: '0.875rem' }}>Not available.</Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+
+                    {/* Cashflow Analysis Card */}
+                    <Grid item xs={12}>
+                      <Card sx={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        p: 2,
+                      }}>
+                        <CardContent>
+                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', mb: 2, fontSize: '1rem' }}>
+                            Monthly Cashflow
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                              <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>
+                                  {analysis.cashflow ? `€${analysis.cashflow}` : 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                  Gross
+                                </Typography>
+                              </Box>
+                            </Grid>
+                            <Grid item xs={6}>
+                              <Box sx={{ textAlign: 'center' }}>
+                                <Typography variant="body1" sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>
+                                  {analysis.cashflowAfterMortgage ? `€${analysis.cashflowAfterMortgage}` : 'N/A'}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                  Net After Mortgage
+                                </Typography>
+                              </Box>
+                            </Grid>
+                          </Grid>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  </Grid>
+
+                  {/* Full Analysis */}
+                  <Card sx={{
+                    backgroundColor: '#F9FAFB',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '12px',
+                    mb: 3
+                  }}>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', mb: 2, fontSize: '1rem' }}>
+                        Detailed Analysis
+                      </Typography>
+                      {analysis.analysis || analysis.explanation ? (
+                        <>
+                          <Box
+                            ref={analysisRef}
+                            sx={{
+                              backgroundColor: '#ffffff',
+                              borderRadius: '8px',
+                              p: 2,
+                              border: '1px solid #E5E7EB',
+                              overflow: 'hidden',
+                              display: '-webkit-box',
+                              WebkitLineClamp: showFullAnalysis ? 'unset' : 5,
+                              WebkitBoxOrient: 'vertical',
+                              cursor: isClamped && !showFullAnalysis ? 'pointer' : 'default',
+                            }}
+                            onClick={() => isClamped && !showFullAnalysis && setShowFullAnalysis(true)}
+                          >
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                lineHeight: 1.6, 
+                                whiteSpace: 'pre-wrap',
+                                color: '#374151',
+                                userSelect: 'text',
+                                fontSize: '0.875rem'
+                              }}
+                            >
+                              {analysis.analysis || analysis.explanation}
+                            </Typography>
+                          </Box>
+                          {isClamped && !showFullAnalysis && (
+                            <Box sx={{ mt: 1 }}>
+                              <Button size="small" onClick={e => { e.stopPropagation(); setShowFullAnalysis(true); }}>
+                                See more
+                              </Button>
+                            </Box>
+                          )}
+                          {showFullAnalysis && (
+                            <Box sx={{ mt: 1 }}>
+                              <Button size="small" onClick={e => { e.stopPropagation(); setShowFullAnalysis(false); }}>
+                                See less
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      ) : (
+                        <Typography sx={{ color: '#6B7280', fontSize: '0.875rem' }}>Not available.</Typography>
+                      )}
+                    </CardContent>
+                  </Card>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={handleSaveInvestment}
+                      sx={{
+                        backgroundColor: '#8B5CF6',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        py: 1.5,
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        textTransform: 'none',
+                        boxShadow: 'none',
+                        '&:hover': {
+                          backgroundColor: '#7C3AED',
+                          boxShadow: 'none'
+                        }
+                      }}
+                      startIcon={<SaveIcon />}
+                    >
+                      Save to Portfolio
+                    </Button>
+                  </Box>
+                </Box>
+              </Fade>
+            </Paper>
+          </Box>
+        )}
+
         <Grid container spacing={4} sx={{ flex: 1, minHeight: 0 }}>
-          {/* Left Side: Input Form */}
-          <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Input Form - Full width when analysis is shown */}
+          <Grid item xs={12} sx={{ display: 'flex', flexDirection: 'column' }}>
             {!(step === 5 && analysis) && (
               <Paper sx={{ 
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '24px',
-                p: 4,
-                boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+                backgroundColor: '#ffffff',
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 3,
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                 flex: 1
               }}>
                 <Box sx={{ mb: 4 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                    <HomeIcon sx={{ fontSize: 32, color: '#667eea', mr: 1 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                    <HomeIcon sx={{ fontSize: 24, color: '#8B5CF6', mr: 1 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', fontSize: '1.125rem' }}>
                       {step === 1 ? 'Location Details' :
                        step === 2 ? 'Property Info' :
                        step === 3 ? 'Financial Details' :
@@ -263,7 +511,7 @@ const AddRealEstate = () => {
                        'Analysis'}
                     </Typography>
                   </Box>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>
+                  <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.875rem' }}>
                     {step === 1 && 'Enter the location of your real estate investment.'}
                     {step === 2 && 'Provide property information.'}
                     {step === 3 && 'Enter financial details.'}
@@ -272,7 +520,7 @@ const AddRealEstate = () => {
                   </Typography>
                 </Box>
 
-                <Grid container spacing={3}>
+                <Grid container spacing={2}>
                   {/* Step 1: Location Section */}
                   {step === 1 && <>
                     <Grid item xs={12}>
@@ -284,10 +532,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -301,10 +550,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -318,10 +568,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -338,10 +589,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -355,10 +607,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -372,10 +625,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -389,10 +643,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -409,10 +664,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -426,10 +682,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -443,10 +700,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -460,10 +718,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -477,10 +736,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -494,10 +754,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -514,10 +775,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -531,10 +793,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -548,10 +811,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -565,10 +829,11 @@ const AddRealEstate = () => {
                         fullWidth 
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            borderRadius: '12px',
-                            background: 'rgba(248, 250, 252, 0.8)',
-                            '&:hover fieldset': { borderColor: '#667eea' },
-                            '&.Mui-focused fieldset': { borderColor: '#667eea' }
+                            borderRadius: '8px',
+                            backgroundColor: '#F9FAFB',
+                            '& fieldset': { borderColor: '#E5E7EB' },
+                            '&:hover fieldset': { borderColor: '#D1D5DB' },
+                            '&.Mui-focused fieldset': { borderColor: '#8B5CF6' }
                           }
                         }}
                       />
@@ -585,12 +850,50 @@ const AddRealEstate = () => {
                 {/* Step navigation buttons */}
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
                   {step > 1 ? (
-                    <Button variant="outlined" onClick={() => setStep(step - 1)}>
+                    <Button 
+                      variant="outlined" 
+                      onClick={() => setStep(step - 1)}
+                      sx={{
+                        borderColor: '#E5E7EB',
+                        color: '#1F2937',
+                        borderRadius: '12px',
+                        py: 1.5,
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        textTransform: 'none',
+                        '&:hover': {
+                          borderColor: '#D1D5DB',
+                          backgroundColor: '#F9FAFB'
+                        }
+                      }}
+                    >
                       Back
                     </Button>
                   ) : <span />}
                   {step < 5 ? (
-                    <Button variant="contained" onClick={() => setStep(step + 1)} disabled={!isStepValid()}>
+                    <Button 
+                      variant="contained" 
+                      onClick={() => setStep(step + 1)} 
+                      disabled={!isStepValid()}
+                      sx={{
+                        backgroundColor: '#8B5CF6',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        py: 1.5,
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        textTransform: 'none',
+                        boxShadow: 'none',
+                        '&:hover': {
+                          backgroundColor: '#7C3AED',
+                          boxShadow: 'none'
+                        },
+                        '&:disabled': {
+                          backgroundColor: '#D1D5DB',
+                          color: '#9CA3AF'
+                        }
+                      }}
+                    >
                       Next
                     </Button>
                   ) : null}
@@ -599,27 +902,28 @@ const AddRealEstate = () => {
                       variant="contained"
                       onClick={handleAnalyze}
                       disabled={loading}
-                      startIcon={loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <AnalyticsIcon />}
+                      startIcon={loading ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <AnalyticsIcon />}
                       sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        borderRadius: '16px',
-                        py: 2,
+                        backgroundColor: '#8B5CF6',
+                        color: '#ffffff',
+                        borderRadius: '12px',
+                        py: 1.5,
                         fontWeight: 600,
+                        fontSize: '0.875rem',
                         textTransform: 'none',
-                        fontSize: '1.1rem',
+                        boxShadow: 'none',
                         '&:hover': {
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 12px 30px rgba(102, 126, 234, 0.4)'
+                          backgroundColor: '#7C3AED',
+                          boxShadow: 'none'
                         },
                         '&:disabled': {
-                          background: 'rgba(100, 116, 139, 0.3)',
-                          color: 'rgba(255,255,255,0.7)'
+                          backgroundColor: '#D1D5DB',
+                          color: '#9CA3AF'
                         },
-                        transition: 'all 0.3s ease',
                         ml: 2
                       }}
                     >
-                      {loading ? 'Analyzing Real Estate...' : 'Analyze Real Estate'}
+                      {loading ? 'Analyzing...' : 'Analyze Real Estate'}
                     </Button>
                   )}
                 </Box>
@@ -627,305 +931,7 @@ const AddRealEstate = () => {
             )}
           </Grid>
 
-          {/* Right Side: Analysis Results */}
-          {(step === 5 && analysis) && (
-            <Grid item xs={12} md={7} sx={{ display: 'flex', flexDirection: 'column', mt: -8 }}>
-              <Paper sx={{ 
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '24px',
-                p: 4,
-                boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
-                flex: 1
-              }}>
-                <Box sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <HomeIcon sx={{ fontSize: 32, color: '#667eea', mr: 1 }} />
-                    <Typography variant="h5" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                      AI Analysis Results
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Comprehensive real estate investment analysis powered by artificial intelligence
-                  </Typography>
-                </Box>
-                <Fade in={!!analysis}>
-                  <Box>
-                    {/* Analysis Cards */}
-                    <Grid container spacing={3} sx={{ mb: 6 }}>
-                      {/* Grade Card */}
-                      <Grid item xs={12} md={6}>
-                        <Card sx={{
-                          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)',
-                          border: '1px solid rgba(16, 185, 129, 0.2)',
-                          borderRadius: '16px',
-                          textAlign: 'center',
-                          p: 1.5,
-                          height: '100%',
-                          transition: 'transform 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-4px)'
-                          }
-                        }}>
-                          <CardContent sx={{ pb: 0 }}>
-                            <AssessmentIcon sx={{ fontSize: 48, color: getGradeColor(analysis.grade), mb: 0.5 }} />
-                            <Typography 
-                              variant="h2" 
-                              sx={{ 
-                                color: getGradeColor(analysis.grade), 
-                                fontWeight: 700,
-                                mb: 0.5
-                              }}
-                            >
-                              {analysis.grade || '-'}
-                            </Typography>
-                            <Typography variant="h6" sx={{ color: '#64748b', fontWeight: 600, mb: 0.5 }}>
-                              Investment Grade
-                            </Typography>
-                            <Typography variant="body1" sx={{ color: '#64748b' }}>
-                              AI-powered assessment of investment quality
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
 
-                      {/* Risk Analysis Card */}
-                      <Grid item xs={12} md={6}>
-                        <Card sx={{
-                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.1) 100%)',
-                          border: '1px solid rgba(59, 130, 246, 0.2)',
-                          borderRadius: '16px',
-                          p: 1.5,
-                          height: '100%',
-                          transition: 'transform 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-4px)'
-                          }
-                        }}>
-                          <CardContent sx={{ pb: 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 0.5 }}>
-                              <SecurityIcon sx={{ fontSize: 48, color: '#3b82f6', mr: 1 }} />
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                                Risk Assessment
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 0.5 }}>
-                              <Typography variant="h2" sx={{ fontWeight: 700, color: '#3b82f6', mr: 1 }}>
-                                {analysis.riskScore || 'N/A'}
-                              </Typography>
-                              <Typography variant="h6" sx={{ color: '#64748b', fontWeight: 600 }}>
-                                /10 Risk Score
-                              </Typography>
-                            </Box>
-                            <Typography variant="body1" sx={{ color: '#64748b' }}>
-                              Comprehensive risk evaluation based on market factors
-                            </Typography>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-
-                      {/* ROI Scenarios Card */}
-                      <Grid item xs={12} sx={{ mt: 3 }}>
-                        <Card sx={{
-                          background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%)',
-                          border: '1px solid rgba(168, 85, 247, 0.2)',
-                          borderRadius: '16px',
-                          p: 2,
-                          transition: 'transform 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-4px)'
-                          }
-                        }}>
-                          <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                              <TrendingUpIcon sx={{ fontSize: 32, color: '#a855f7', mr: 1 }} />
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                                ROI Scenarios
-                              </Typography>
-                            </Box>
-                            {analysis.roiScenarios ? (
-                              <Grid container spacing={3}>
-                                <Grid item xs={12} sm={4}>
-                                  <Box sx={{ textAlign: 'center' }}>
-                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#ef4444', mb: 1 }}>
-                                      {analysis.roiScenarios.pessimistic}%
-                                    </Typography>
-                                    <Chip 
-                                      label="Pessimistic" 
-                                      size="small"
-                                      sx={{ 
-                                        background: 'rgba(239, 68, 68, 0.1)',
-                                        color: '#ef4444',
-                                        fontWeight: 600
-                                      }}
-                                    />
-                                  </Box>
-                                </Grid>
-                                <Grid item xs={12} sm={4}>
-                                  <Box sx={{ textAlign: 'center' }}>
-                                    <Typography variant="h3" sx={{ fontWeight: 700, color: '#a855f7', mb: 1 }}>
-                                      {analysis.roiScenarios.realistic}%
-                                    </Typography>
-                                    <Chip 
-                                      label="Realistic (Avg.)" 
-                                      size="small"
-                                      sx={{ 
-                                        background: 'rgba(168, 85, 247, 0.2)',
-                                        color: '#a855f7',
-                                        fontWeight: 600
-                                      }}
-                                    />
-                                  </Box>
-                                </Grid>
-                                <Grid item xs={12} sm={4}>
-                                  <Box sx={{ textAlign: 'center' }}>
-                                    <Typography variant="h4" sx={{ fontWeight: 700, color: '#10b981', mb: 1 }}>
-                                      {analysis.roiScenarios.optimistic}%
-                                    </Typography>
-                                    <Chip 
-                                      label="Optimistic" 
-                                      size="small"
-                                      sx={{ 
-                                        background: 'rgba(16, 185, 129, 0.1)',
-                                        color: '#10b981',
-                                        fontWeight: 600
-                                      }}
-                                    />
-                                  </Box>
-                                </Grid>
-                              </Grid>
-                            ) : (
-                              <Typography sx={{ color: '#64748b' }}>Not available.</Typography>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </Grid>
-
-                      {/* Cashflow Analysis Card */}
-                      <Grid item xs={12}>
-                        <Card sx={{
-                          background: 'linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(21, 128, 61, 0.1) 100%)',
-                          border: '1px solid rgba(34, 197, 94, 0.2)',
-                          borderRadius: '16px',
-                          p: 2,
-                          transition: 'transform 0.2s ease',
-                          '&:hover': {
-                            transform: 'translateY(-4px)'
-                          }
-                        }}>
-                          <CardContent>
-                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                              <EuroIcon sx={{ fontSize: 32, color: '#22c55e', mr: 1 }} />
-                              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                                Monthly Cashflow Analysis
-                              </Typography>
-                            </Box>
-                            <Grid container spacing={3}>
-                              <Grid item xs={12} sm={6}>
-                                <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#22c55e', mb: 1 }}>
-                                    {analysis.cashflow ? `€${analysis.cashflow}` : 'N/A'}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                                    Gross Monthly Cashflow
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                              <Grid item xs={12} sm={6}>
-                                <Box sx={{ textAlign: 'center' }}>
-                                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#22c55e', mb: 1 }}>
-                                    {analysis.cashflowAfterMortgage ? `€${analysis.cashflowAfterMortgage}` : 'N/A'}
-                                  </Typography>
-                                  <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
-                                    Net Cashflow After Mortgage
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                            </Grid>
-                          </CardContent>
-                        </Card>
-                      </Grid>
-                    </Grid>
-
-                    {/* Full Analysis */}
-                    <Card sx={{
-                      borderRadius: '16px',
-                      border: '1px solid rgba(226, 232, 240, 0.8)',
-                      mb: 3
-                    }}>
-                      <CardContent>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                          Detailed Analysis
-                        </Typography>
-                        {analysis.explanation ? (
-                          <>
-                            <Box
-                              ref={analysisRef}
-                              sx={{
-                                background: 'rgba(248, 250, 252, 0.8)',
-                                borderRadius: '12px',
-                                p: 3,
-                                border: '1px solid rgba(226, 232, 240, 0.8)',
-                                overflow: 'hidden',
-                                display: '-webkit-box',
-                                WebkitLineClamp: showFullAnalysis ? 'unset' : 3,
-                                WebkitBoxOrient: 'vertical',
-                                cursor: isClamped && !showFullAnalysis ? 'pointer' : 'default',
-                              }}
-                              onClick={() => isClamped && !showFullAnalysis && setShowFullAnalysis(true)}
-                            >
-                              <Typography 
-                                variant="body1" 
-                                sx={{ 
-                                  lineHeight: 1.7, 
-                                  whiteSpace: 'pre-wrap',
-                                  color: '#374151',
-                                  userSelect: 'text'
-                                }}
-                              >
-                                {analysis.explanation}
-                              </Typography>
-                            </Box>
-                            {isClamped && !showFullAnalysis && (
-                              <Box sx={{ mt: 1 }}>
-                                <Button size="small" onClick={e => { e.stopPropagation(); setShowFullAnalysis(true); }}>
-                                  See more
-                                </Button>
-                              </Box>
-                            )}
-                            {showFullAnalysis && (
-                              <Box sx={{ mt: 1 }}>
-                                <Button size="small" onClick={e => { e.stopPropagation(); setShowFullAnalysis(false); }}>
-                                  See less
-                                </Button>
-                              </Box>
-                            )}
-                          </>
-                        ) : (
-                          <Typography sx={{ color: '#64748b' }}>Not available.</Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-                      <Button variant="outlined" onClick={() => setStep(step - 1)}>
-                        Back
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="success"
-                        onClick={handleSaveInvestment}
-                        sx={{ borderRadius: '16px', py: 2, fontWeight: 700, fontSize: '1.1rem', ml: 2 }}
-                        startIcon={<SaveIcon />}
-                      >
-                        Save to Portfolio
-                      </Button>
-                    </Box>
-                  </Box>
-                </Fade>
-              </Paper>
-            </Grid>
-          )}
         </Grid>
       </Container>
       
@@ -935,4 +941,6 @@ const AddRealEstate = () => {
 };
 
 export default AddRealEstate;
+
+
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box, Typography, Button, Container, Grid, Card, CardContent, 
-  Avatar, Fade, Slide
+  Box, Typography, Button, Container, Grid, Card, CardContent,
+  Avatar, Fade, Slide, Accordion, AccordionSummary, AccordionDetails
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -14,6 +14,7 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import StarIcon from '@mui/icons-material/Star';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Footer from './Footer';
 
 const LandingPage = () => {
@@ -34,40 +35,34 @@ const LandingPage = () => {
 
   const features = [
     {
-      icon: <AutoAwesomeIcon sx={{ fontSize: 40 }} />,
-      title: "AI-Powered Analysis",
-      description: "Advanced artificial intelligence analyzes your investments and provides personalized recommendations based on market data and risk assessment.",
-      color: "#667eea"
+      icon: <AutoAwesomeIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
+      title: "AI Analysis",
+      description: "AI-powered insights for informed decisions.",
     },
     {
-      icon: <TrendingUpIcon sx={{ fontSize: 40 }} />,
-      title: "Smart Portfolio Overview",
-      description: "Instantly view and analyze all your holdings with valuations, risk breakdowns, and AI-powered insights.",
-      color: "#10b981"
+      icon: <TrendingUpIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
+      title: "Portfolio Overview",
+      description: "Instant view of holdings and risk.",
     },
     {
-      icon: <SecurityIcon sx={{ fontSize: 40 }} />,
+      icon: <SecurityIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
       title: "Risk Assessment",
-      description: "Comprehensive risk analysis with detailed explanations and grade-based scoring to help you make informed investment decisions.",
-      color: "#f59e0b"
+      description: "Comprehensive risk analysis and scoring.",
     },
     {
-      icon: <HomeIcon sx={{ fontSize: 40 }} />,
-      title: "Real Estate Analysis",
-      description: "Specialized tools for real estate investment analysis including cashflow calculations, market valuations, and financing scenarios.",
-      color: "#ef4444"
+      icon: <HomeIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
+      title: "Real Estate Tools",
+      description: "Specialized tools for property analysis.",
     },
     {
-      icon: <AssessmentIcon sx={{ fontSize: 40 }} />,
+      icon: <AssessmentIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
       title: "Investment Grading",
-      description: "Get clear A-F grades for your investments with detailed explanations of strengths, weaknesses, and improvement opportunities.",
-      color: "#8b5cf6"
+      description: "Clear A-F grades with detailed explanations.",
     },
     {
-      icon: <ChatIcon sx={{ fontSize: 40 }} />,
-      title: "Advanced Portfolio Stress Testing",
-      description: "Pressure-test your portfolio by applying custom market shocks, macro events, and rate shifts, then gauge resilience with AI-driven risk forecasts.",
-      color: "#06b6d4"
+      icon: <ChatIcon sx={{ fontSize: 24, color: '#8B5CF6' }} />,
+      title: "Stress Testing",
+      description: "Pressure-test portfolios with market shocks.",
     }
   ];
 
@@ -82,21 +77,21 @@ const LandingPage = () => {
 
   const testimonials = [
     {
-      name: "Sarah Johnson",
+      name: "Sarah J.",
       role: "Portfolio Manager",
-      content: "FlowInvest has transformed how I analyze investments. The AI insights are incredibly accurate and have helped me optimize my portfolio performance by 23%.",
+      content: "FlowInvest transformed my analysis. AI insights are incredibly accurate, optimizing my portfolio by 23%. ",
       rating: 5
     },
     {
-      name: "Michael Chen",
+      name: "Michael C.",
       role: "Real Estate Investor",
-      content: "The real estate analysis tools are phenomenal. I can quickly evaluate properties and make confident investment decisions with comprehensive risk assessments.",
+      content: "The real estate tools are phenomenal. I quickly evaluate properties and make confident decisions.",
       rating: 5
     },
     {
-      name: "Emma Rodriguez",
+      name: "Emma R.",
       role: "Financial Advisor",
-      content: "My clients love the clear investment grades and detailed explanations. It makes complex financial concepts easy to understand and act upon.",
+      content: "My clients love the clear investment grades. It makes complex finance easy to understand.",
       rating: 5
     }
   ];
@@ -104,170 +99,274 @@ const LandingPage = () => {
   return (
     <Box sx={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      backgroundColor: '#ffffff',
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Animated Background Elements */}
+      {/* Header */}
       <Box sx={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        bottom: 0,
-        opacity: 0.1,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.2) 0%, transparent 50%)
-        `
-      }} />
+        zIndex: 10,
+        p: 3,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: 700,
+            color: '#1F2937',
+            fontSize: { xs: '1.75rem', sm: '2.25rem' }
+          }}
+        >
+          FlowInvest
+        </Typography>
+        
+        <Button
+          variant="text"
+          onClick={handleLogin}
+          sx={{
+            color: '#6B7280',
+            fontSize: '0.875rem',
+            fontWeight: 500,
+            textTransform: 'none',
+            '&:hover': {
+              backgroundColor: 'rgba(107, 114, 128, 0.04)',
+            },
+          }}
+        >
+          Sign In
+        </Button>
+      </Box>
 
       {/* Hero Section */}
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-        <Box sx={{ 
-          minHeight: '100vh', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          justifyContent: 'center',
-          py: 8
-        }}>
+      <Container maxWidth="md" sx={{ position: 'relative', zIndex: 1, py: 8 }}>
+        <Box sx={{ textAlign: 'center', mb: 8, mt: 8 }}>
           <Fade in={animationTrigger} timeout={1000}>
-            <Box sx={{ textAlign: 'center', mb: 8 }}>
-              <Typography 
-                variant="h1" 
-                sx={{ 
-                  fontSize: { xs: '3rem', md: '4.5rem', lg: '5.5rem' },
-                  fontWeight: 800,
-                  color: 'white',
-                  mb: 3,
-                  textShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                  background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.8) 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent'
+            <Box>
+              <Typography
+                variant="h3"
+                sx={{
+                  fontWeight: 700,
+                  color: '#1F2937',
+                  mb: 1,
+                  fontSize: { xs: '2.5rem', sm: '3rem' }
                 }}
               >
-                FlowInvest
-              </Typography>
-              
-              <Typography 
-                variant="h4" 
-                sx={{ 
-                  fontSize: { xs: '1.5rem', md: '2rem', lg: '2.5rem' },
-                  fontWeight: 600,
-                  color: 'rgba(255,255,255,0.95)',
-                  mb: 3,
-                  textShadow: '0 2px 10px rgba(0,0,0,0.2)'
-                }}
-              >
-                AI-Powered Investment Intelligence
-              </Typography>
-              
-              <Typography 
-                variant="h6" 
-                sx={{ 
-                  fontSize: { xs: '1.1rem', md: '1.3rem' },
-                  fontWeight: 400,
-                  color: 'rgba(255,255,255,0.85)',
-                  mb: 6,
-                  maxWidth: '800px',
-                  mx: 'auto',
-                  lineHeight: 1.6
-                }}
-              >
-                Transform your investment strategy with cutting-edge artificial intelligence. 
-                Get personalized analysis, risk assessments, and portfolio optimization 
-                powered by advanced machine learning algorithms.
+                Analyze your Portfolio in under 2 Minutes
               </Typography>
 
-              <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Typography
+                variant="body1"
+                sx={{
+                  color: '#6B7280',
+                  mb: 6,
+                  maxWidth: '600px',
+                  mx: 'auto',
+                  lineHeight: 1.5,
+                  fontSize: { xs: '1rem', sm: '1.125rem' }
+                }}
+              >
+                Enter your Data. Upload a Screenshot. Instantly see all your strenghts and weaknesses. All powered by cutting-edge AI
+              </Typography>
+
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
                 <Button
                   variant="contained"
                   size="large"
                   onClick={handleGetStarted}
                   startIcon={<RocketLaunchIcon />}
                   sx={{
-                    background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,1) 100%)',
-                    color: '#667eea',
-                    borderRadius: '50px',
-                    px: 4,
+                    backgroundColor: '#8B5CF6',
+                    color: '#ffffff',
+                    borderRadius: '16px',
+                    px: 6,
                     py: 2,
-                    fontSize: '1.2rem',
-                    fontWeight: 700,
-                    textTransform: 'none',
-                    boxShadow: '0 8px 32px rgba(255,255,255,0.3)',
-                    '&:hover': {
-                      transform: 'translateY(-3px)',
-                      boxShadow: '0 12px 40px rgba(255,255,255,0.4)',
-                      background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,1) 100%)'
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  Start Your Journey
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={handleLogin}
-                  sx={{
-                    borderColor: 'rgba(255,255,255,0.3)',
-                    color: 'white',
-                    borderRadius: '50px',
-                    px: 4,
-                    py: 2,
-                    fontSize: '1.2rem',
+                    fontSize: '1.125rem',
                     fontWeight: 600,
                     textTransform: 'none',
-                    backdropFilter: 'blur(10px)',
-                    background: 'rgba(255,255,255,0.1)',
+                    boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)',
                     '&:hover': {
-                      transform: 'translateY(-3px)',
-                      borderColor: 'rgba(255,255,255,0.5)',
-                      background: 'rgba(255,255,255,0.2)',
-                      boxShadow: '0 12px 40px rgba(255,255,255,0.2)'
+                      backgroundColor: '#7C3AED',
+                      boxShadow: '0 6px 16px rgba(139, 92, 246, 0.3)',
                     },
-                    transition: 'all 0.3s ease'
                   }}
                 >
-                  Sign In
+                  Get Started
                 </Button>
               </Box>
+              
+              {/* Landing Page Screenshot */}
+              <Fade in={animationTrigger} timeout={1500}>
+                <Box sx={{ 
+                  mt: 6, 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  px: 2
+                }}>
+                  <Box sx={{
+                    maxWidth: '100%',
+                    width: { xs: '100%', sm: '90%', md: '80%', lg: '70%' },
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 20px 40px rgba(139, 92, 246, 0.2)',
+                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#ffffff',
+                    position: 'relative'
+                  }}>
+                    <img
+                      src="/landing-page-screenshot (2).png"
+                      alt="FlowInvest Platform Screenshot"
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block',
+                        borderRadius: '16px',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        MozUserSelect: 'none',
+                        msUserSelect: 'none',
+                        pointerEvents: 'none',
+                        WebkitTouchCallout: 'none',
+                        WebkitTapHighlightColor: 'transparent'
+                      }}
+                    />
+                    {/* Gradient overlay for bottom fade */}
+                    <Box sx={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: '100px',
+                      background: 'linear-gradient(to bottom, transparent 0%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.5) 100%)',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    {/* Gradient overlay for top fade */}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '100px',
+                      background: 'linear-gradient(to top, transparent 0%, rgba(255, 255, 255, 0.2) 50%, rgba(255, 255, 255, 0.5) 100%)',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    {/* Gradient overlay for left side fade */}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: 0,
+                      width: '80px',
+                      background: 'linear-gradient(to right, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)',
+                      pointerEvents: 'none'
+                    }} />
+                    
+                    {/* Gradient overlay for right side fade */}
+                    <Box sx={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      right: 0,
+                      width: '80px',
+                      background: 'linear-gradient(to left, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%)',
+                      pointerEvents: 'none'
+                    }} />
+                  </Box>
+                </Box>
+              </Fade>
+              
+              {/* Slogan */}
+              <Fade in={animationTrigger} timeout={1800}>
+                <Box sx={{ 
+                  mt: 4, 
+                  textAlign: 'center',
+                  px: 2
+                }}>
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      fontWeight: 600,
+                      color: '#6B7280',
+                      fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                      fontStyle: 'italic',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Everything in one place
+                  </Typography>
+                </Box>
+              </Fade>
             </Box>
           </Fade>
 
-          {/* Stats Section */}
+        </Box>
+      </Container>
+
+      {/* Stats Section */}
+      <Box sx={{
+        backgroundColor: '#F9FAFB',
+        py: 8,
+        mt: -3,
+        borderTop: '1px solid #E5E7EB',
+        borderBottom: '1px solid #E5E7EB'
+      }}>
+        <Container maxWidth="md">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: '#1F2937',
+              mb: 2,
+              fontSize: { xs: '2rem', sm: '2.5rem' }
+            }}>
+              Trusted by Investors Worldwide
+            </Typography>
+            <Typography variant="body1" sx={{
+              color: '#6B7280',
+              maxWidth: '600px',
+              mx: 'auto',
+              lineHeight: 1.5
+            }}>
+              Our AI has analyzed billions in assets with proven accuracy and reliability.
+            </Typography>
+          </Box>
+
           <Slide direction="up" in={animationTrigger} timeout={1200}>
-            <Grid container spacing={4} sx={{ mt: 8 }}>
+            <Grid container spacing={3}>
               {[
-                { number: "35yrs", label: "Market Datasets Ingested" },
+                { number: "35yrs", label: "Market Data" },
                 { number: "$2.5B+", label: "Assets Analyzed" },
-                { number: "95%", label: "Accuracy Rate" },
+                { number: "95%", label: "Accuracy" },
                 { number: "24/7", label: "AI Support" }
               ].map((stat, index) => (
                 <Grid item xs={6} md={3} key={index}>
                   <Box sx={{
                     textAlign: 'center',
-                    background: 'rgba(255,255,255,0.1)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: '20px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
                     p: 3,
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    transition: 'transform 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-5px)'
-                    }
+                    border: '1px solid #E5E7EB',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center'
                   }}>
-                    <Typography variant="h3" sx={{ 
-                      fontWeight: 800, 
-                      color: 'white',
+                    <Typography variant="h4" sx={{
+                      fontWeight: 700,
+                      color: '#8B5CF6',
                       mb: 1
                     }}>
                       {stat.number}
                     </Typography>
-                    <Typography variant="body1" sx={{ 
-                      color: 'rgba(255,255,255,0.8)',
+                    <Typography variant="body1" sx={{
+                      color: '#6B7280',
                       fontWeight: 500
                     }}>
                       {stat.label}
@@ -277,78 +376,69 @@ const LandingPage = () => {
               ))}
             </Grid>
           </Slide>
-        </Box>
-      </Container>
+        </Container>
+      </Box>
 
       {/* Features Section */}
       <Box sx={{
-        background: 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(20px)',
-        py: 12,
-        position: 'relative'
+        backgroundColor: '#F9FAFB',
+        py: 8,
       }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 8 }}>
-            <Typography variant="h2" sx={{ 
-              fontWeight: 700, 
-              color: '#1e293b',
-              mb: 3,
-              fontSize: { xs: '2.5rem', md: '3.5rem' }
+        <Container maxWidth="md">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: '#1F2937',
+              mb: 2,
+              fontSize: { xs: '2rem', sm: '2.5rem' }
             }}>
-              Powerful Features
+              Key Features
             </Typography>
-            <Typography variant="h6" sx={{ 
-              color: '#64748b',
+            <Typography variant="body1" sx={{
+              color: '#6B7280',
               maxWidth: '600px',
               mx: 'auto',
-              lineHeight: 1.6
+              lineHeight: 1.5
             }}>
-              Everything you need to make smarter investment decisions, 
-              powered by cutting-edge artificial intelligence technology.
+              Everything you need for smarter investment decisions, powered by AI.
             </Typography>
           </Box>
 
-          <Grid container spacing={4}>
+          <Grid container spacing={3}>
             {features.map((feature, index) => (
-              <Grid item xs={12} md={6} lg={4} key={index}>
-                <Fade in={animationTrigger} timeout={1000 + index * 200}>
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Fade in={animationTrigger} timeout={1000 + index * 100}>
                   <Card sx={{
                     height: '100%',
-                    background: 'rgba(255,255,255,0.9)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    borderRadius: '24px',
-                    p: 3,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.1)'
-                    }
+                    backgroundColor: '#ffffff',
+                    borderRadius: '12px',
+                    p: 2,
+                    border: '1px solid #E5E7EB',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
                   }}>
                     <CardContent>
                       <Box sx={{
-                        width: 80,
-                        height: 80,
-                        borderRadius: '20px',
-                        background: `linear-gradient(135deg, ${feature.color}20 0%, ${feature.color}40 100%)`,
+                        width: 48,
+                        height: 48,
+                        borderRadius: '8px',
+                        backgroundColor: '#F3EBFF',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        mb: 3,
-                        color: feature.color
+                        mb: 2,
                       }}>
                         {feature.icon}
                       </Box>
-                      <Typography variant="h5" sx={{ 
-                        fontWeight: 600, 
-                        color: '#1e293b',
-                        mb: 2
+                      <Typography variant="h6" sx={{
+                        fontWeight: 600,
+                        color: '#1F2937',
+                        mb: 1
                       }}>
                         {feature.title}
                       </Typography>
-                      <Typography variant="body1" sx={{ 
-                        color: '#64748b',
-                        lineHeight: 1.6
+                      <Typography variant="body2" sx={{
+                        color: '#6B7280',
+                        lineHeight: 1.5
                       }}>
                         {feature.description}
                       </Typography>
@@ -363,44 +453,44 @@ const LandingPage = () => {
 
       {/* Benefits Section */}
       <Box sx={{
-        background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-        py: 12,
-        color: 'white'
+        backgroundColor: '#1F2937',
+        py: 8,
+        color: '#ffffff'
       }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={8} alignItems="center">
+        <Container maxWidth="md">
+          <Grid container spacing={4} alignItems="center">
             <Grid item xs={12} md={6}>
-              <Typography variant="h2" sx={{ 
+              <Typography variant="h4" sx={{
                 fontWeight: 700,
-                mb: 4,
-                fontSize: { xs: '2.5rem', md: '3rem' }
+                mb: 3,
+                fontSize: { xs: '2rem', sm: '2.5rem' }
               }}>
                 Why Choose FlowInvest?
               </Typography>
-              <Typography variant="h6" sx={{ 
-                color: 'rgba(255,255,255,0.8)',
+              <Typography variant="body1" sx={{
+                color: '#D1D5DB',
                 mb: 4,
-                lineHeight: 1.6
+                lineHeight: 1.5
               }}>
                 Transform your investment strategy with cutting-edge AI—unlock smarter insights and optimized portfolios today.
               </Typography>
-              
-              <Box sx={{ mb: 6 }}>
+
+              <Box sx={{ mb: 4 }}>
                 {benefits.map((benefit, index) => (
                   <Fade in={animationTrigger} timeout={1500 + index * 100} key={index}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      mb: 2 
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      mb: 1.5
                     }}>
-                      <CheckCircleIcon sx={{ 
-                        color: '#10b981', 
-                        mr: 2,
-                        fontSize: 24
+                      <CheckCircleIcon sx={{
+                        color: '#10B981',
+                        mr: 1,
+                        fontSize: 20
                       }} />
-                      <Typography variant="body1" sx={{ 
+                      <Typography variant="body2" sx={{
                         fontWeight: 500,
-                        fontSize: '1.1rem'
+                        color: '#ffffff'
                       }}>
                         {benefit}
                       </Typography>
@@ -415,36 +505,38 @@ const LandingPage = () => {
                 onClick={handleGetStarted}
                 endIcon={<ArrowForwardIcon />}
                 sx={{
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  borderRadius: '50px',
-                  px: 4,
-                  py: 2,
-                  fontSize: '1.1rem',
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
+                  borderRadius: '12px',
+                  px: 3,
+                  py: 1.5,
+                  fontSize: '1rem',
                   fontWeight: 600,
                   textTransform: 'none',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.2)',
                   '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 12px 30px rgba(102, 126, 234, 0.4)'
+                    backgroundColor: '#7C3AED',
+                    boxShadow: '0 6px 16px rgba(139, 92, 246, 0.3)',
                   },
-                  transition: 'all 0.3s ease'
                 }}
               >
                 Get Started Now
               </Button>
             </Grid>
-            
+
             <Grid item xs={12} md={6}>
               <Box sx={{
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: '24px',
-                p: 4,
-                border: '1px solid rgba(255,255,255,0.2)'
+                backgroundColor: '#374151',
+                borderRadius: '12px',
+                p: 3,
+                border: '1px solid #4B5563',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
               }}>
-                <Typography variant="h4" sx={{ 
+                <Typography variant="h5" sx={{
                   fontWeight: 600,
-                  mb: 3,
-                  textAlign: 'center'
+                  mb: 2,
+                  textAlign: 'center',
+                  color: '#ffffff'
                 }}>
                   Investment Success Rate
                 </Typography>
@@ -452,20 +544,20 @@ const LandingPage = () => {
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
-                  mb: 3
+                  mb: 2
                 }}>
-                  <Typography variant="h1" sx={{ 
-                    fontSize: '4rem',
-                    fontWeight: 800,
-                    color: '#10b981'
+                  <Typography variant="h2" sx={{
+                    fontSize: '3rem',
+                    fontWeight: 700,
+                    color: '#10B981'
                   }}>
                     95%
                   </Typography>
                 </Box>
-                <Typography variant="body1" sx={{ 
+                <Typography variant="body2" sx={{
                   textAlign: 'center',
-                  color: 'rgba(255,255,255,0.8)',
-                  lineHeight: 1.6
+                  color: '#D1D5DB',
+                  lineHeight: 1.5
                 }}>
                   Back-tested portfolios outperformed their benchmarks in the first three months on FlowInvest.
                 </Typography>
@@ -477,87 +569,80 @@ const LandingPage = () => {
 
       {/* Testimonials Section */}
       <Box sx={{
-        background: 'rgba(255,255,255,0.95)',
-        backdropFilter: 'blur(20px)',
-        py: 12
+        backgroundColor: '#ffffff',
+        py: 8
       }}>
-        <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 8 }}>
-            <Typography variant="h2" sx={{ 
-              fontWeight: 700, 
-              color: '#1e293b',
-              mb: 3,
-              fontSize: { xs: '2.5rem', md: '3.5rem' }
+        <Container maxWidth="md">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: '#1F2937',
+              mb: 2,
+              fontSize: { xs: '2rem', sm: '2.5rem' }
             }}>
               What Our Users Say
             </Typography>
-            <Typography variant="h6" sx={{ 
-              color: '#64748b',
+            <Typography variant="body1" sx={{
+              color: '#6B7280',
               maxWidth: '600px',
               mx: 'auto',
-              lineHeight: 1.6
+              lineHeight: 1.5
             }}>
-              Join thousands of satisfied investors who have transformed their 
-              investment strategy with FlowInvest.
+              Join thousands of satisfied investors who have transformed their investment strategy with FlowInvest.
             </Typography>
           </Box>
 
-          <Grid container spacing={4}>
+          <Grid container spacing={3}>
             {testimonials.map((testimonial, index) => (
-              <Grid item xs={12} md={4} key={index}>
-                <Fade in={animationTrigger} timeout={1800 + index * 200}>
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Fade in={animationTrigger} timeout={1800 + index * 100}>
                   <Card sx={{
                     height: '100%',
-                    background: 'rgba(255,255,255,0.9)',
-                    backdropFilter: 'blur(20px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    borderRadius: '24px',
-                    p: 4,
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      transform: 'translateY(-8px)',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.1)'
-                    }
+                    backgroundColor: '#F9FAFB',
+                    borderRadius: '12px',
+                    p: 2,
+                    border: '1px solid #E5E7EB',
+                    boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
                   }}>
                     <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                        <Avatar sx={{ 
-                          width: 56, 
-                          height: 56, 
-                          bgcolor: '#667eea',
-                          mr: 2
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Avatar sx={{
+                          width: 48,
+                          height: 48,
+                          bgcolor: '#8B5CF6',
+                          mr: 1.5
                         }}>
                           {testimonial.name.charAt(0)}
                         </Avatar>
                         <Box>
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 600, 
-                            color: '#1e293b'
+                          <Typography variant="h6" sx={{
+                            fontWeight: 600,
+                            color: '#1F2937'
                           }}>
                             {testimonial.name}
                           </Typography>
-                          <Typography variant="body2" sx={{ 
-                            color: '#64748b'
+                          <Typography variant="body2" sx={{
+                            color: '#6B7280'
                           }}>
                             {testimonial.role}
                           </Typography>
                         </Box>
                       </Box>
-                      
-                      <Typography variant="body1" sx={{ 
-                        color: '#64748b',
-                        lineHeight: 1.6,
-                        mb: 3,
+
+                      <Typography variant="body2" sx={{
+                        color: '#374151',
+                        lineHeight: 1.5,
+                        mb: 2,
                         fontStyle: 'italic'
                       }}>
                         "{testimonial.content}"
                       </Typography>
-                      
+
                       <Box sx={{ display: 'flex' }}>
                         {[...Array(testimonial.rating)].map((_, i) => (
-                          <StarIcon key={i} sx={{ 
-                            color: '#fbbf24', 
-                            fontSize: 20 
+                          <StarIcon key={i} sx={{
+                            color: '#FBBF24',
+                            fontSize: 16
                           }} />
                         ))}
                       </Box>
@@ -570,9 +655,131 @@ const LandingPage = () => {
         </Container>
       </Box>
 
+      {/* FAQ Section */}
+      <Box sx={{
+        backgroundColor: '#F9FAFB',
+        py: 8,
+        borderTop: '1px solid #E5E7EB'
+      }}>
+        <Container maxWidth="md">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Typography variant="h4" sx={{
+              fontWeight: 700,
+              color: '#1F2937',
+              mb: 2,
+              fontSize: { xs: '2rem', sm: '2.5rem' }
+            }}>
+              Frequently Asked Questions
+            </Typography>
+            <Typography variant="body1" sx={{
+              color: '#6B7280',
+              maxWidth: '600px',
+              mx: 'auto',
+              lineHeight: 1.5
+            }}>
+              Everything you need to know about FlowInvest and AI-powered investment analysis.
+            </Typography>
+          </Box>
+
+          <Box sx={{ maxWidth: '800px', mx: 'auto' }}>
+            {[
+              {
+                question: "How does FlowInvest analyze my portfolio?",
+                answer: "FlowInvest uses advanced AI algorithms to analyze your investments, considering factors like diversification, risk tolerance, market conditions, and your personal goals. We provide detailed grades, risk scores, and actionable recommendations."
+              },
+              {
+                question: "Is my financial data secure?",
+                answer: "Absolutely. We use bank-level encryption and security measures to protect your data. Your information is never shared with third parties, and we comply with all major financial data protection regulations."
+              },
+              {
+                question: "How accurate is the AI analysis?",
+                answer: "Our AI has been trained on 35+ years of market data and achieves 95% accuracy in portfolio analysis. The system continuously learns and improves from new market data and user feedback."
+              },
+              {
+                question: "What types of investments does FlowInvest support?",
+                answer: "We support stocks, bonds, ETFs, mutual funds, real estate investments, commodities, cryptocurrencies, options, futures, and much more. Our AI can analyze both individual investments and entire portfolios across multiple asset classes."
+              },
+              {
+                question: "How long does it take to get my first analysis?",
+                answer: "You can get your first portfolio analysis in under 2 minutes. Simply upload a screenshot of your portfolio and let the AI do its work."
+              },
+              {
+                question: "Do I need to be an investment expert to use FlowInvest?",
+                answer: "Not at all! FlowInvest is designed for investors of all experience levels. Our AI explains complex financial concepts in simple terms and provides clear, actionable recommendations."
+              },
+              {
+                question: "Can I use FlowInvest for real estate investments?",
+                answer: "Yes! We have specialized tools for real estate analysis, including cash flow analysis, ROI calculations, and market trend assessments. Our AI can evaluate both residential and commercial properties."
+              },
+              {
+                question: "What if I disagree with the AI recommendations?",
+                answer: "FlowInvest provides recommendations, but you always maintain full control over your investment decisions. Our analysis is meant to inform, not replace, your judgment. You can accept, modify, or ignore any suggestions."
+              },
+              {
+                question: "How often should I update my portfolio analysis?",
+                answer: "We recommend updating your analysis monthly or whenever you make significant changes to your portfolio. Our AI can track changes over time and show you how your portfolio's performance and risk profile evolve."
+              },
+              {
+                question: "Is there a limit to how many investments I can analyze?",
+                answer: "No limits! You can analyze portfolios of any size, from a few investments to hundreds of different assets. Our AI scales to handle portfolios of all sizes efficiently."
+              },
+              {
+                question: "What makes FlowInvest different from other investment apps?",
+                answer: "Unlike traditional apps that just track performance, FlowInvest provides intelligent analysis powered by AI. We don't just show you what's going on, we explain why and predict what might happen next, with personalized recommendations."
+              },
+            ].map((faq, index) => (
+              <Fade in={animationTrigger} timeout={2000 + index * 100} key={index}>
+                <Accordion sx={{
+                  backgroundColor: '#ffffff',
+                  borderRadius: '12px',
+                  mb: 2,
+                  border: '1px solid #E5E7EB',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+                  '&:before': {
+                    display: 'none',
+                  },
+                  '&.Mui-expanded': {
+                    margin: '8px 0',
+                  }
+                }}>
+                  <AccordionSummary
+                    expandIcon={<ExpandMoreIcon sx={{ color: '#8B5CF6' }} />}
+                    sx={{
+                      '& .MuiAccordionSummary-content': {
+                        margin: '16px 0',
+                      },
+                      '&:hover': {
+                        backgroundColor: 'rgba(139, 92, 246, 0.02)',
+                      }
+                    }}
+                  >
+                    <Typography variant="h6" sx={{
+                      fontWeight: 600,
+                      color: '#1F2937',
+                      fontSize: '1rem'
+                    }}>
+                      {faq.question}
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails sx={{ pt: 0, pb: 3 }}>
+                    <Typography variant="body2" sx={{
+                      color: '#6B7280',
+                      lineHeight: 1.6
+                    }}>
+                      {faq.answer}
+                    </Typography>
+                  </AccordionDetails>
+                </Accordion>
+              </Fade>
+            ))}
+          </Box>
+        </Container>
+      </Box>
+
       <Footer />
     </Box>
   );
 };
 
 export default LandingPage;
+

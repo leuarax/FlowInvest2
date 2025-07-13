@@ -17,6 +17,7 @@ module.exports = {
           800: '#1565C0',
           900: '#0D47A1',
         },
+        purple10: '#F3E8FF', // 10% purple (very light purple)
       },
       fontFamily: {
         sans: ['SF Pro Display', 'system-ui', 'sans-serif'],

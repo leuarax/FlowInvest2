@@ -95,8 +95,8 @@ export const getPortfolioAnalysis = async (investments, userProfile) => {
     });
 
     console.log('Portfolio analysis response status:', response.status);
-    
     const responseData = await response.json().catch(() => ({}));
+    console.log('Portfolio analysis API responseData:', responseData);
     
     if (!response.ok) {
       console.error('Portfolio API error response:', responseData);

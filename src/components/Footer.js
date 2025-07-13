@@ -11,9 +11,7 @@ const Footer = () => {
         mt: 'auto',
         width: '100%',
         left: 0,
-        background: 'rgba(255,255,255,0.1)',
-        backdropFilter: 'blur(10px)',
-        borderTop: '1px solid rgba(255,255,255,0.2)',
+        background: '#ffffff',
         position: 'relative',
       }}
     >
@@ -30,7 +28,7 @@ const Footer = () => {
           <Typography
             variant="body2"
             sx={{
-              color: 'rgba(255,255,255,0.8)',
+              color: '#6B7280',
               textAlign: 'center',
               fontFamily: '"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
               fontWeight: 400
@@ -43,13 +41,13 @@ const Footer = () => {
             component={RouterLink}
             to="/imprint"
             sx={{
-              color: 'rgba(255,255,255,0.8)',
+              color: '#6B7280',
               textDecoration: 'none',
               fontSize: '0.875rem',
               fontFamily: '"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
               fontWeight: 400,
               '&:hover': {
-                color: 'white',
+                color: '#1F2937',
                 textDecoration: 'underline'
               },
               transition: 'all 0.3s ease'
@@ -61,13 +59,13 @@ const Footer = () => {
             component={RouterLink}
             to="/privacy-policy"
             sx={{
-              color: 'rgba(255,255,255,0.8)',
+              color: '#6B7280',
               textDecoration: 'none',
               fontSize: '0.875rem',
               fontFamily: '"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
               fontWeight: 400,
               '&:hover': {
-                color: 'white',
+                color: '#1F2937',
                 textDecoration: 'underline'
               },
               transition: 'all 0.3s ease'
@@ -80,13 +78,13 @@ const Footer = () => {
             component={RouterLink}
             to="/financial-disclaimer"
             sx={{
-              color: 'rgba(255,255,255,0.8)',
+              color: '#6B7280',
               textDecoration: 'none',
               fontSize: '0.875rem',
               fontFamily: '"SF Pro Display", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif',
               fontWeight: 400,
               '&:hover': {
-                color: 'white',
+                color: '#1F2937',
                 textDecoration: 'underline'
               },
               transition: 'all 0.3s ease'

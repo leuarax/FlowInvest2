@@ -17,23 +17,18 @@ import {
   Modal,
   Fade,
   Backdrop,
-  Chip,
-  Avatar,
   IconButton,
-  Tooltip,
   LinearProgress,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
+  DialogActions,
+  Grid, // Added Grid import
+  Avatar
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
-  Delete as DeleteIcon,
-  TrendingUp as TrendingUpIcon,
-  Security as SecurityIcon,
-  AccountBalanceWallet as AccountBalanceWalletIcon,
-  ArrowForward as ArrowForwardIcon
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import Footer from './Footer';
 
@@ -46,6 +41,7 @@ const Portfolio = () => {
   const [stats, setStats] = useState({
     totalPortfolio: 0,
     avgROI: 0,
+    avgROIRange: { pessimistic: 0, realistic: 0, optimistic: 0 },
     avgRisk: 0,
     investmentCount: 0,
   });
@@ -65,24 +61,43 @@ const Portfolio = () => {
       // Calculate stats
       if (firebaseInvestments.length > 0) {
         const total = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-        const avgROI = firebaseInvestments.reduce((acc, inv) => {
-          let roi = parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, ''));
+        
+        // Calculate weighted average ROI scenarios based on portfolio allocation
+        const weightedROIScenarios = firebaseInvestments.reduce((acc, inv) => {
+          const amount = parseFloat(inv.amount) || 0;
+          const weight = total > 0 ? amount / total : 0;
+          let pessimistic = inv.roiScenarios?.pessimistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
+          let realistic = inv.roiScenarios?.realistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
+          let optimistic = inv.roiScenarios?.optimistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
           if (inv.type === 'Real Estate') {
-            const amount = parseFloat(inv.amount) || 1;
             const netCashflow = inv.cashflowAfterMortgage !== undefined && inv.cashflowAfterMortgage !== null
               ? parseFloat(inv.cashflowAfterMortgage)
               : (inv.cashflow !== undefined && inv.cashflow !== null ? parseFloat(inv.cashflow) : 0);
             const annualCashflow = netCashflow * 12;
             const cashflowROI = amount > 0 ? (annualCashflow / amount) * 100 : 0;
-            roi = roi * 12 + cashflowROI;
+            pessimistic += cashflowROI;
+            realistic += cashflowROI;
+            optimistic += cashflowROI;
           }
-          return acc + (isNaN(roi) ? 0 : roi);
-        }, 0) / firebaseInvestments.length;
+          return {
+            pessimistic: acc.pessimistic + (weight * pessimistic),
+            realistic: acc.realistic + (weight * realistic),
+            optimistic: acc.optimistic + (weight * optimistic)
+          };
+        }, { pessimistic: 0, realistic: 0, optimistic: 0 });
+        
+        const avgROI = weightedROIScenarios.realistic; // Use realistic as the main average
+        const avgROIRange = {
+          pessimistic: weightedROIScenarios.pessimistic,
+          realistic: weightedROIScenarios.realistic,
+          optimistic: weightedROIScenarios.optimistic
+        };
         const avgRisk = firebaseInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / firebaseInvestments.length;
 
         setStats({
           totalPortfolio: total,
           avgROI,
+          avgROIRange,
           avgRisk,
           investmentCount: firebaseInvestments.length,
         });
@@ -104,25 +119,14 @@ const Portfolio = () => {
   }, [user, navigate, loadInvestments]);
 
   const getGradeColor = (grade) => {
-    if (!grade) return '#64748b';
+    if (!grade) return '#6B7280';
     const upperGrade = grade.toUpperCase();
-    if (upperGrade.startsWith('A')) return '#10b981';
-    if (upperGrade.startsWith('B')) return '#f59e0b';
-    if (upperGrade.startsWith('C')) return '#f97316';
-    if (upperGrade.startsWith('D')) return '#ef4444';
-    if (upperGrade.startsWith('F')) return '#dc2626';
-    return '#64748b';
-  };
-
-  const getGradeGradient = (grade) => {
-    if (!grade) return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
-    const upperGrade = grade.toUpperCase();
-    if (upperGrade.startsWith('A')) return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-    if (upperGrade.startsWith('B')) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-    if (upperGrade.startsWith('C')) return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
-    if (upperGrade.startsWith('D')) return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-    if (upperGrade.startsWith('F')) return 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
-    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+    if (upperGrade.startsWith('A')) return '#10B981';
+    if (upperGrade.startsWith('B')) return '#F59E0B';
+    if (upperGrade.startsWith('C')) return '#F97316';
+    if (upperGrade.startsWith('D')) return '#EF4444';
+    if (upperGrade.startsWith('F')) return '#DC2626';
+    return '#6B7280';
   };
 
   const formatROI = (value) => {
@@ -130,6 +134,8 @@ const Portfolio = () => {
     const num = parseFloat(String(value).replace(/[^0-9.-]+/g, ''));
     return isNaN(num) ? '0.0' : num.toFixed(1);
   };
+
+
 
   const handleOpenModal = (investment) => {
     setSelectedInvestment(investment);
@@ -155,12 +161,36 @@ const Portfolio = () => {
         // Recalculate stats
         if (updatedInvestments.length > 0) {
           const total = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.amount), 0);
-          const avgROI = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.roiEstimate), 0) / updatedInvestments.length;
+          
+          // Calculate weighted average ROI scenarios based on portfolio allocation
+          const weightedROIScenarios = updatedInvestments.reduce((acc, inv) => {
+            const amount = parseFloat(inv.amount) || 0;
+            const weight = total > 0 ? amount / total : 0;
+            
+            // Get ROI scenarios if available, otherwise use roiEstimate for all scenarios
+            const pessimistic = inv.roiScenarios?.pessimistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
+            const realistic = inv.roiScenarios?.realistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
+            const optimistic = inv.roiScenarios?.optimistic || parseFloat(String(inv.roiEstimate).replace(/[^0-9.-]+/g, '')) || 0;
+            
+            return {
+              pessimistic: acc.pessimistic + (weight * pessimistic),
+              realistic: acc.realistic + (weight * realistic),
+              optimistic: acc.optimistic + (weight * optimistic)
+            };
+          }, { pessimistic: 0, realistic: 0, optimistic: 0 });
+          
+          const avgROI = weightedROIScenarios.realistic; // Use realistic as the main average
+          const avgROIRange = {
+            pessimistic: weightedROIScenarios.pessimistic,
+            realistic: weightedROIScenarios.realistic,
+            optimistic: weightedROIScenarios.optimistic
+          };
           const avgRisk = updatedInvestments.reduce((acc, inv) => acc + parseFloat(inv.riskScore), 0) / updatedInvestments.length;
 
           setStats({
             totalPortfolio: total,
             avgROI,
+            avgROIRange,
             avgRisk,
             investmentCount: updatedInvestments.length,
           });
@@ -168,6 +198,7 @@ const Portfolio = () => {
           setStats({
             totalPortfolio: 0,
             avgROI: 0,
+            avgROIRange: { pessimistic: 0, realistic: 0, optimistic: 0 },
             avgRisk: 0,
             investmentCount: 0,
           });
@@ -178,273 +209,340 @@ const Portfolio = () => {
     }
   };
 
-
-
   return (
     <Box sx={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      '&::before': {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
-        pointerEvents: 'none'
-      }
+      backgroundColor: '#ffffff',
+      position: 'relative'
     }}>
-      <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: 4, pb: 6, flex: 1 }}>
+      <Container maxWidth="lg" sx={{ py: 3, px: 2 }}>
         {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          mb: 4,
+          pb: 2,
+          borderBottom: '1px solid #E5E7EB'
+        }}>
+          <Typography
+            variant="h4"
+            component="h1"
+            sx={{
+              color: '#1F2937',
+              fontSize: { xs: '1.5rem', sm: '2rem' },
+              fontWeight: 700,
+              letterSpacing: '-0.025em'
+            }}
+          >
+            FlowInvest
+          </Typography>
+          
           <Button
             onClick={() => navigate('/dashboard')}
             startIcon={<ArrowBackIcon />}
-            variant="outlined"
             sx={{
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.3)',
-              color: 'white',
+              backgroundColor: '#F9FAFB',
+              border: '1px solid #E5E7EB',
               borderRadius: '12px',
-              px: 3,
-              py: 1.5,
+              px: 2,
+              py: 1,
+              color: '#6B7280',
               fontWeight: 600,
               textTransform: 'none',
-              mr: 3,
               '&:hover': {
-                background: 'rgba(255,255,255,0.2)',
-                borderColor: 'rgba(255,255,255,0.4)',
-                transform: 'translateY(-1px)',
-                boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-              },
-              transition: 'all 0.3s ease'
+                backgroundColor: '#F3F4F6',
+                borderColor: '#D1D5DB'
+              }
             }}
           >
-            Back to Dashboard
+            Dashboard
           </Button>
-          <Typography
-            variant="h3"
-            sx={{
-              color: 'white',
-              fontWeight: 800,
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Portfolio Details
-          </Typography>
-        </Box>
-        {/* Avg Yearly ROI and Avg Risk Cards */}
-        <Box sx={{ display: 'flex', gap: 3, mb: 4 }}>
-          <Paper
-            sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white', boxShadow: 3, cursor: 'pointer', transition: 'box-shadow 0.2s', '&:hover': { boxShadow: '0 8px 24px #f093fb55' } }}
-            onClick={() => setRoiModalOpen(true)}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <TrendingUpIcon sx={{ fontSize: 32 }} />
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Avg Yearly ROI</Typography>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>{stats.avgROI.toFixed(1)}%</Typography>
-          </Paper>
-          <Paper sx={{ flex: 1, p: 3, borderRadius: '16px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white', boxShadow: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <SecurityIcon sx={{ fontSize: 32 }} />
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>Avg Risk</Typography>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 800, mt: 1 }}>{stats.avgRisk.toFixed(1)}/10</Typography>
-          </Paper>
         </Box>
 
-
+        {/* Portfolio Summary Cards */}
+        <Grid container spacing={2} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={4}>
+            <Paper
+              sx={{
+                backgroundColor: '#F3E8FF', // 10% purple
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 2,
+                textAlign: 'center',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <Typography 
+                sx={{ 
+                  color: '#1F2937', 
+                  fontWeight: 600,
+                  fontSize: '1.5rem'
+                }}
+              >
+                ${stats.totalPortfolio.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </Typography>
+              <Typography 
+                sx={{ 
+                  color: '#6B7280', 
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }}
+              >
+                Total Value
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Paper
+              sx={{
+                backgroundColor: '#F3E8FF', // 10% purple
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 2,
+                textAlign: 'center',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <Typography 
+                sx={{ 
+                  color: '#1F2937', 
+                  fontWeight: 600,
+                  fontSize: '1.5rem'
+                }}
+              >
+                {stats.avgROIRange.pessimistic.toFixed(1)}% - {stats.avgROIRange.optimistic.toFixed(1)}%
+              </Typography>
+              <Typography 
+                sx={{ 
+                  color: '#6B7280', 
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }}
+              >
+                Avg Yearly ROI
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <Paper
+              sx={{
+                backgroundColor: '#F3E8FF', // 10% purple
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 2,
+                textAlign: 'center',
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
+              }}
+            >
+              <Typography 
+                sx={{ 
+                  color: '#1F2937', 
+                  fontWeight: 600,
+                  fontSize: '1.5rem'
+                }}
+              >
+                {stats.avgRisk.toFixed(1)}/10
+              </Typography>
+              <Typography 
+                sx={{ 
+                  color: '#6B7280', 
+                  fontSize: '0.875rem',
+                  fontWeight: 500
+                }}
+              >
+                Avg Risk
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
 
         {/* Investments Table */}
         <Box sx={{ mb: 4 }}>
-          <Typography variant="h5" sx={{ color: 'white', mb: 3, fontWeight: 600 }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              color: '#1F2937', 
+              mb: 2, 
+              fontWeight: 600,
+              fontSize: '1.125rem'
+            }}
+          >
             Your Investments ({investments.length})
           </Typography>
           
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-              <CircularProgress sx={{ color: 'white' }} size={60} thickness={4} />
+              <CircularProgress sx={{ color: '#8B5CF6' }} size={40} />
             </Box>
           ) : investments.length === 0 ? (
             <Paper sx={{
-              background: 'rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: '20px',
-              p: 6,
-              textAlign: 'center'
+              backgroundColor: '#F9FAFB',
+              border: '1px solid #E5E7EB',
+              borderRadius: '16px',
+              p: 3,
+              textAlign: 'center',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)'
             }}>
-              <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
+              <Typography 
+                variant="body1" 
+                sx={{ 
+                  color: '#1F2937', 
+                  mb: 1,
+                  fontWeight: 500
+                }}
+              >
                 No investments yet
               </Typography>
-              <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                Start building your portfolio by adding your first investment
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  color: '#6B7280',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Add your first investment to see it here.
               </Typography>
+              <Button
+                variant="contained"
+                onClick={() => navigate('/add-investment')}
+                sx={{
+                  mt: 2,
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
+                  borderRadius: '12px',
+                  py: 1,
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  textTransform: 'none',
+                  boxShadow: 'none',
+                  '&:hover': {
+                    backgroundColor: '#7C3AED',
+                    boxShadow: 'none'
+                  }
+                }}
+              >
+                Add Investment
+              </Button>
             </Paper>
           ) : (
-            <Box sx={{ width: '100%', overflowX: 'auto' }}>
-              <TableContainer component={Paper} sx={{
-                background: 'rgba(255,255,255,0.1)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(255,255,255,0.2)',
-                borderRadius: '20px',
-                overflow: 'hidden',
-                minWidth: { xs: 800, sm: 'unset' }
-              }}>
-                <Table sx={{ minWidth: 800 }}>
-                  <TableHead>
-                    <TableRow sx={{ background: 'rgba(255,255,255,0.1)' }}>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        Investment
+            <TableContainer component={Paper} sx={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #E5E7EB',
+              borderRadius: '16px',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+              overflowX: 'auto',
+              minWidth: { xs: '100%', sm: 'unset' }
+            }}>
+              <Table sx={{ minWidth: 650 }}>
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Investment</TableCell>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Amount</TableCell>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>ROI</TableCell>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Risk</TableCell>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {investments.map((investment, index) => (
+                    <TableRow
+                      key={`${investment.name}-${index}`}
+                      hover
+                      sx={{
+                        cursor: 'pointer',
+                        '&:last-child td, &:last-child th': { border: 0 },
+                        '&:hover': { backgroundColor: '#F9FAFB' }
+                      }}
+                      onClick={() => handleOpenModal(investment)}
+                    >
+                      <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {investment.grade && (
+                            <Avatar
+                              sx={{
+                                width: 28,
+                                height: 28,
+                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                backgroundColor: getGradeColor(investment.grade),
+                                color: '#ffffff',
+                              }}
+                            >
+                              {investment.grade}
+                            </Avatar>
+                          )}
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: '#1F2937',
+                              fontWeight: 500,
+                              maxWidth: { xs: 100, sm: 150 },
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {investment.name}
+                          </Typography>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        Type
+                      <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>
+                        ${parseFloat(investment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </TableCell>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        Amount
+                      <TableCell sx={{ color: '#10B981', fontSize: '0.875rem', fontWeight: 500, borderBottom: '1px solid #E5E7EB' }}>
+                        {formatROI(investment.roiEstimate)}%
                       </TableCell>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        ROI
+                      <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ color: '#1F2937', minWidth: '30px' }}>
+                            {investment.riskScore}/10
+                          </Typography>
+                          <Box sx={{ flex: 1, maxWidth: 60 }}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={(investment.riskScore / 10) * 100}
+                              sx={{
+                                height: 6,
+                                borderRadius: 3,
+                                backgroundColor: '#E5E7EB',
+                                '& .MuiLinearProgress-bar': {
+                                  borderRadius: 3,
+                                  backgroundColor: investment.riskScore > 7 
+                                    ? '#EF4444'
+                                    : investment.riskScore > 4
+                                    ? '#F59E0B'
+                                    : '#10B981'
+                                }
+                              }}
+                            />
+                          </Box>
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        Risk
-                      </TableCell>
-                      <TableCell sx={{ color: 'white', fontWeight: 600, borderBottom: '1px solid rgba(255,255,255,0.2)' }}>
-                        Actions
+                      <TableCell sx={{ borderBottom: '1px solid #E5E7EB' }}>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton
+                            onClick={(e) => { e.stopPropagation(); deleteInvestment(investment); }}
+                            sx={{
+                              backgroundColor: '#FEF2F2',
+                              color: '#DC2626',
+                              borderRadius: '8px',
+                              width: 32,
+                              height: 32,
+                              '&:hover': {
+                                backgroundColor: '#FEE2E2'
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
                       </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {investments.map((investment, index) => (
-                      <TableRow
-                        key={`${investment.name}-${index}`}
-                        onClick={() => handleOpenModal(investment)}
-                        sx={{
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            background: 'rgba(255,255,255,0.1)',
-                            transform: 'translateY(-2px)'
-                          }
-                        }}
-                      >
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {investment.grade && (
-                              <Avatar
-                                sx={{
-                                  width: 32,
-                                  height: 32,
-                                  fontWeight: 700,
-                                  fontSize: '1rem',
-                                  background: getGradeGradient(investment.grade),
-                                  color: 'white',
-                                  mr: 1,
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.10)'
-                                }}
-                              >
-                                {investment.grade}
-                              </Avatar>
-                            )}
-                            <Typography
-                              variant="body1"
-                              sx={{
-                                color: 'white',
-                                fontWeight: 600,
-                                maxWidth: { xs: 90, sm: 160, md: 220 },
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                fontSize: { xs: '0.97rem', sm: '1.05rem' }
-                              }}
-                            >
-                              {investment.name}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Chip 
-                            label={investment.type || 'Stock'}
-                            sx={{
-                              background: 'rgba(255,255,255,0.2)',
-                              color: 'white',
-                              fontWeight: 600
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Typography variant="body1" sx={{ color: 'white', fontWeight: 600 }}>
-                            ${parseFloat(investment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Typography variant="body1" sx={{ color: '#10b981', fontWeight: 600 }}>
-                            {formatROI(investment.roiEstimate)}%
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="body2" sx={{ color: 'white', minWidth: '30px' }}>
-                              {investment.riskScore}/10
-                            </Typography>
-                            <Box sx={{ flex: 1, maxWidth: 60 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={(investment.riskScore / 10) * 100}
-                                sx={{
-                                  height: 6,
-                                  borderRadius: 3,
-                                  backgroundColor: 'rgba(255,255,255,0.2)',
-                                  '& .MuiLinearProgress-bar': {
-                                    borderRadius: 3,
-                                    background: investment.riskScore > 7 
-                                      ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
-                                      : investment.riskScore > 4
-                                      ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
-                                      : 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
-                                  }
-                                }}
-                              />
-                            </Box>
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ color: 'white', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                          <Tooltip title="Delete Investment">
-                            <IconButton
-                              onClick={(e) => { e.stopPropagation(); deleteInvestment(investment); }}
-                              sx={{
-                                background: 'rgba(239, 68, 68, 0.2)',
-                                color: '#ef4444',
-                                '&:hover': {
-                                  background: 'rgba(239, 68, 68, 0.3)',
-                                  transform: 'scale(1.1)'
-                                },
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              {/* Scroll Indicator */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', mt: 1, mb: 2, gap: 1 }}>
-                <Typography variant="body2" sx={{ color: 'white', opacity: 0.7, fontWeight: 500 }}>
-                  scroll
-                </Typography>
-                <ArrowForwardIcon sx={{ color: 'white', opacity: 0.7, fontSize: 18 }} />
-              </Box>
-            </Box>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           )}
         </Box>
 
@@ -457,7 +555,7 @@ const Portfolio = () => {
             BackdropComponent={Backdrop}
             BackdropProps={{
               timeout: 500,
-              sx: { backdropFilter: 'blur(10px)' }
+              sx: { backgroundColor: 'rgba(0, 0, 0, 0.5)' }
             }}
           >
             <Fade in={!!selectedInvestment}>
@@ -466,278 +564,479 @@ const Portfolio = () => {
                 top: '50%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
-                width: { xs: '95%', sm: '90%', md: 700 },
+                width: { xs: '95%', sm: '90%', md: '600px' },
                 maxHeight: '90vh',
                 overflowY: 'auto',
-                background: 'rgba(255,255,255,0.95)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '24px',
-                p: { xs: 3, sm: 4 },
-                boxShadow: '0 25px 50px rgba(0,0,0,0.25)'
+                backgroundColor: '#ffffff',
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 3,
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
               }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <Box sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: '50%',
-                    background: getGradeGradient(selectedInvestment.grade),
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mr: 3,
-                    border: '3px solid rgba(255,255,255,0.5)',
-                    boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
-                  }}>
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: '2rem',
-                        color: 'white',
-                        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                      }}
-                    >
-                      {selectedInvestment.grade}
-                    </Typography>
-                  </Box>
-                  
-                  <Box>
-                    <Typography 
-                      variant="h4" 
-                      component="h2" 
-                      sx={{ 
-                        fontWeight: 700,
-                        color: '#1e293b',
-                        mb: 1,
-                        fontSize: { xs: '1.5rem', sm: '2rem' }
-                      }}
-                    >
-                      {selectedInvestment.name}
-                    </Typography>
-                    <Chip 
-                      label={selectedInvestment.type}
-                      sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        fontWeight: 600
-                      }}
-                    />
-                  </Box>
-                </Box>
-
-                <Box sx={{ mb: 4 }}>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1e293b' }}>
-                    Investment Details
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      fontWeight: 700,
+                      color: '#1F2937',
+                      fontSize: '1.5rem'
+                    }}
+                  >
+                    {selectedInvestment.name}
                   </Typography>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2 }}>
-                    <Paper sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      borderRadius: '16px',
-                      p: 3,
-                      textAlign: 'center',
-                      color: 'white'
-                    }}>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                        Investment Amount
-                      </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                        ${parseFloat(selectedInvestment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Typography>
-                    </Paper>
-                    
-                    <Paper sx={{
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      borderRadius: '16px',
-                      p: 3,
-                      textAlign: 'center',
-                      color: 'white'
-                    }}>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                        Expected ROI
-                      </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                        {formatROI(selectedInvestment.roiEstimate)}%
-                      </Typography>
-                    </Paper>
-                    
-                    <Paper sx={{
-                      background: selectedInvestment.riskScore > 7 
-                        ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                        : selectedInvestment.riskScore > 4
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                        : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      borderRadius: '16px',
-                      p: 3,
-                      textAlign: 'center',
-                      color: 'white'
-                    }}>
-                      <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                        Risk Score
-                      </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                        {selectedInvestment.riskScore}/10
-                      </Typography>
-                    </Paper>
-                  </Box>
-                </Box>
-
-                {selectedInvestment.roiScenarios && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600, color: '#1e293b', fontSize: { xs: '1rem', sm: '1.1rem' } }}>
-                      ROI Scenarios
-                    </Typography>
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1 }}>
-                      <Paper sx={{
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                        borderRadius: '12px',
-                        p: 1.2,
-                        textAlign: 'center',
-                        color: 'white'
-                      }}>
-                        <Typography variant="caption" sx={{ opacity: 0.8, mb: 0.5, fontSize: '0.85rem' }}>
-                          Pessimistic
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                          {selectedInvestment.roiScenarios.pessimistic?.toFixed(1)}%
-                        </Typography>
-                      </Paper>
-                      <Paper sx={{
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        borderRadius: '12px',
-                        p: 1.2,
-                        textAlign: 'center',
-                        color: 'white'
-                      }}>
-                        <Typography variant="caption" sx={{ opacity: 0.8, mb: 0.5, fontSize: '0.85rem' }}>
-                          Realistic
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                          {selectedInvestment.roiScenarios.realistic?.toFixed(1)}%
-                        </Typography>
-                      </Paper>
-                      <Paper sx={{
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        borderRadius: '12px',
-                        p: 1.2,
-                        textAlign: 'center',
-                        color: 'white'
-                      }}>
-                        <Typography variant="caption" sx={{ opacity: 0.8, mb: 0.5, fontSize: '0.85rem' }}>
-                          Optimistic
-                        </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                          {selectedInvestment.roiScenarios.optimistic?.toFixed(1)}%
-                        </Typography>
-                      </Paper>
-                    </Box>
-                  </Box>
-                )}
-
-                {selectedInvestment.explanation && (
-                  <Box sx={{ mb: 4 }}>
-                    <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: '#1e293b' }}>
-                      Analysis
-                    </Typography>
-                    <Paper sx={{
-                      background: 'rgba(248,250,252,0.8)',
-                      borderRadius: '12px',
-                      p: 3,
-                      border: '1px solid rgba(226,232,240,0.8)'
-                    }}>
-                      <Typography variant="body1" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-                        {selectedInvestment.explanation}
-                      </Typography>
-                    </Paper>
-                  </Box>
-                )}
-
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <Button
+                  
+                  <IconButton
                     onClick={handleCloseModal}
-                    variant="contained"
                     sx={{
-                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                      borderRadius: '12px',
-                      px: 4,
-                      py: 1.5,
-                      fontWeight: 600,
-                      textTransform: 'none',
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      width: 32,
+                      height: 32,
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'
+                        backgroundColor: '#F3F4F6'
                       }
                     }}
                   >
-                    Close
-                  </Button>
+                    <ArrowBackIcon sx={{ fontSize: 16, color: '#6B7280' }} />
+                  </IconButton>
                 </Box>
+
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={12} sm={4}>
+                    <Paper sx={{
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      p: 2,
+                      textAlign: 'center'
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                        {selectedInvestment.grade && (
+                          <Avatar
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              fontWeight: 700,
+                              fontSize: '1.25rem',
+                              backgroundColor: getGradeColor(selectedInvestment.grade),
+                              color: '#ffffff',
+                            }}
+                          >
+                            {selectedInvestment.grade}
+                          </Avatar>
+                        )}
+                        {!selectedInvestment.grade && (
+                          <Typography 
+                            sx={{ 
+                              color: '#6B7280', 
+                              fontWeight: 600,
+                              fontSize: '1.25rem'
+                            }}
+                          >
+                            -
+                          </Typography>
+                        )}
+                      </Box>
+                      <Typography 
+                        sx={{ 
+                          color: '#6B7280', 
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}
+                      >
+                        Grade
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Paper sx={{
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      p: 2,
+                      textAlign: 'center'
+                    }}>
+                      <Typography 
+                        sx={{ 
+                          color: '#1F2937', 
+                          fontWeight: 600,
+                          fontSize: '1.25rem'
+                        }}
+                      >
+                        ${parseFloat(selectedInvestment.amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Typography>
+                      <Typography 
+                        sx={{ 
+                          color: '#6B7280', 
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}
+                      >
+                        Amount
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <Paper sx={{
+                      backgroundColor: '#F9FAFB',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '12px',
+                      p: 2,
+                      textAlign: 'center'
+                    }}>
+                      <Typography 
+                        sx={{ 
+                          color: '#1F2937', 
+                          fontWeight: 600,
+                          fontSize: '1.25rem'
+                        }}
+                      >
+                        {formatROI(selectedInvestment.roiEstimate)}%
+                      </Typography>
+                      <Typography 
+                        sx={{ 
+                          color: '#6B7280', 
+                          fontSize: '0.75rem',
+                          fontWeight: 500
+                        }}
+                      >
+                        ROI
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                {/* Monthly Cashflow for Real Estate */}
+                {selectedInvestment.type === 'Real Estate' && (selectedInvestment.cashflow || selectedInvestment.cashflowAfterMortgage) && (
+                  <Grid container spacing={2} sx={{ mb: 3 }}>
+                    <Grid item xs={12} sm={6}>
+                      <Paper sx={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '12px',
+                        p: 2,
+                        textAlign: 'center'
+                      }}>
+                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1F2937', mb: 1, fontSize: '1rem' }}>
+                          Monthly Cashflow
+                        </Typography>
+                        <Grid container spacing={2}>
+                          <Grid item xs={6}>
+                            <Box sx={{ textAlign: 'center' }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>
+                                {selectedInvestment.cashflow !== undefined && selectedInvestment.cashflow !== null ? `€${selectedInvestment.cashflow}` : 'N/A'}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                Gross
+                              </Typography>
+                            </Box>
+                          </Grid>
+                          <Grid item xs={6}>
+                            <Box sx={{ textAlign: 'center' }}>
+                              <Typography variant="body1" sx={{ fontWeight: 600, color: '#10B981', fontSize: '0.875rem' }}>
+                                {selectedInvestment.cashflowAfterMortgage !== undefined && selectedInvestment.cashflowAfterMortgage !== null ? `€${selectedInvestment.cashflowAfterMortgage}` : 'N/A'}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#6B7280', fontSize: '0.75rem' }}>
+                                Net After Mortgage
+                              </Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+                      </Paper>
+                    </Grid>
+                  </Grid>
+                )}
+
+                {selectedInvestment.roiScenarios && (
+                  <Box sx={{ mb: 3 }}>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: '#1F2937', 
+                        mb: 2,
+                        fontSize: '1.125rem'
+                      }}
+                    >
+                      ROI Scenarios
+                    </Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={4}>
+                        <Paper sx={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          p: 2,
+                          textAlign: 'center'
+                        }}>
+                          <Typography 
+                            sx={{ 
+                              color: '#EF4444', 
+                              fontWeight: 600,
+                              fontSize: '1rem'
+                            }}
+                          >
+                            {selectedInvestment.roiScenarios.pessimistic?.toFixed(1)}%
+                          </Typography>
+                          <Typography 
+                            sx={{ 
+                              color: '#6B7280', 
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Pessimistic
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Paper sx={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          p: 2,
+                          textAlign: 'center'
+                        }}>
+                          <Typography 
+                            sx={{ 
+                              color: '#8B5CF6', 
+                              fontWeight: 600,
+                              fontSize: '1rem'
+                            }}
+                          >
+                            {selectedInvestment.roiScenarios.realistic?.toFixed(1)}%
+                          </Typography>
+                          <Typography 
+                            sx={{ 
+                              color: '#6B7280', 
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Realistic
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <Paper sx={{
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          borderRadius: '12px',
+                          p: 2,
+                          textAlign: 'center'
+                        }}>
+                          <Typography 
+                            sx={{ 
+                              color: '#10B981', 
+                              fontWeight: 600,
+                              fontSize: '1rem'
+                            }}
+                          >
+                            {selectedInvestment.roiScenarios.optimistic?.toFixed(1)}%
+                          </Typography>
+                          <Typography 
+                            sx={{ 
+                              color: '#6B7280', 
+                              fontSize: '0.75rem'
+                            }}
+                          >
+                            Optimistic
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    </Grid>
+                  </Box>
+                )}
+
+                <Box sx={{ mb: 4 }}>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      fontWeight: 600, 
+                      color: '#1F2937', 
+                      mb: 2,
+                      fontSize: '1.125rem'
+                    }}
+                  >
+                    Analysis
+                  </Typography>
+                  <Paper sx={{
+                    backgroundColor: '#F9FAFB',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '12px',
+                    p: 2
+                  }}>
+                    {Array.isArray(selectedInvestment.analysis) && selectedInvestment.analysis.length > 0 ? (
+                      <ul style={{ paddingLeft: 0, margin: 0, listStyle: 'none' }}>
+                        {selectedInvestment.analysis.map((line, idx) => (
+                          <li key={idx} style={{ marginBottom: 8, color: '#374151', fontSize: '0.95em' }}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : selectedInvestment.analysis ? (
+                      <Typography variant="body2" sx={{ color: '#374151', lineHeight: 1.6, fontSize: '0.875rem' }}>
+                        {selectedInvestment.analysis}
+                      </Typography>
+                    ) : null}
+                    {selectedInvestment.explanation && (
+                      <Typography variant="body2" sx={{ color: '#6B7280', mt: 2, fontSize: '0.85em' }}>
+                        {selectedInvestment.explanation}
+                      </Typography>
+                    )}
+                  </Paper>
+                </Box>
+
+                <Button
+                  onClick={handleCloseModal}
+                  fullWidth
+                  variant="contained"
+                  sx={{
+                    backgroundColor: '#8B5CF6',
+                    color: '#ffffff',
+                    borderRadius: '12px',
+                    py: 1.5,
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    textTransform: 'none',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      backgroundColor: '#7C3AED',
+                      boxShadow: 'none'
+                    }
+                  }}
+                >
+                  Close
+                </Button>
               </Box>
             </Fade>
           </Modal>
         )}
-      </Container>
-      {/* ROI Calculation Modal */}
-      <Dialog open={roiModalOpen} onClose={() => setRoiModalOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, color: '#f093fb' }}>Average ROI Calculation</DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            The table below shows the pessimistic, realistic, and optimistic ROI for each investment. The average for each scenario is shown at the bottom.
-          </Typography>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><b>Investment</b></TableCell>
-                  <TableCell align="right"><b>Pessimistic</b></TableCell>
-                  <TableCell align="right"><b>Realistic</b></TableCell>
-                  <TableCell align="right"><b>Optimistic</b></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {investments.map((inv, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>{inv.name}</TableCell>
-                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.pessimistic).toFixed(1)}%` : '-'}</TableCell>
-                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.realistic).toFixed(1)}%` : '-'}</TableCell>
-                    <TableCell align="right">{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.optimistic).toFixed(1)}%` : '-'}</TableCell>
+
+        {/* ROI Calculation Modal */}
+        <Dialog open={roiModalOpen} onClose={() => setRoiModalOpen(false)} maxWidth="sm" fullWidth
+          PaperProps={{
+            sx: {
+              borderRadius: '16px',
+              backgroundColor: '#ffffff',
+              border: '1px solid #E5E7EB'
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            backgroundColor: '#F9FAFB',
+            borderBottom: '1px solid #E5E7EB',
+            borderRadius: '16px 16px 0 0',
+            pb: 2
+          }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 600,
+                color: '#1F2937',
+                fontSize: '1.125rem'
+              }}
+            >
+              Average ROI Calculation
+            </Typography>
+          </DialogTitle>
+          <DialogContent sx={{ p: 3 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: '#6B7280', 
+                mb: 2,
+                fontSize: '0.875rem'
+              }}
+            >
+              The table below shows the pessimistic, realistic, and optimistic ROI for each investment. The average for each scenario is shown at the bottom.
+            </Typography>
+            <TableContainer component={Paper} sx={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #E5E7EB',
+              borderRadius: '12px',
+              boxShadow: 'none'
+            }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow sx={{ backgroundColor: '#F9FAFB' }}>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Investment</TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Pessimistic</TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Realistic</TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>Optimistic</TableCell>
                   </TableRow>
-                ))}
-                {/* Averages Row */}
-                <TableRow>
-                  <TableCell><b>Average</b></TableCell>
-                  <TableCell align="right">
-                    {(() => {
-                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.pessimistic) : null).filter(v => v !== null && !isNaN(v));
-                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
-                    })()}
-                  </TableCell>
-                  <TableCell align="right">
-                    {(() => {
-                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.realistic) : null).filter(v => v !== null && !isNaN(v));
-                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
-                    })()}
-                  </TableCell>
-                  <TableCell align="right">
-                    {(() => {
-                      const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.optimistic) : null).filter(v => v !== null && !isNaN(v));
-                      return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
-                    })()}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <Typography variant="body2" sx={{ mt: 3, color: '#64748b' }}>
-            <b>How is Avg Yearly ROI calculated?</b><br/>
-            The Avg Yearly ROI shown on your portfolio is the average of the <b>realistic</b> ROI values across all your investments. Each investment's realistic ROI is estimated based on its type and data. The average is calculated as the sum of all realistic ROIs divided by the number of investments.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRoiModalOpen(false)} variant="contained" color="primary">Close</Button>
-        </DialogActions>
-      </Dialog>
+                </TableHead>
+                <TableBody>
+                  {investments.map((inv, idx) => (
+                    <TableRow key={idx}>
+                      <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>{inv.name}</TableCell>
+                      <TableCell align="right" sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.pessimistic).toFixed(1)}%` : '-'}</TableCell>
+                      <TableCell align="right" sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.realistic).toFixed(1)}%` : '-'}</TableCell>
+                      <TableCell align="right" sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>{inv.roiScenarios ? `${parseFloat(inv.roiScenarios.optimistic).toFixed(1)}%` : '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                  {/* Averages Row */}
+                  <TableRow sx={{ backgroundColor: '#F9FAFB', '&:last-child td': { borderBottom: 0 } }}>
+                    <TableCell sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>Average</TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {(() => {
+                        const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.pessimistic) : null).filter(v => v !== null && !isNaN(v));
+                        return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {(() => {
+                        const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.realistic) : null).filter(v => v !== null && !isNaN(v));
+                        return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell align="right" sx={{ color: '#1F2937', fontWeight: 600, fontSize: '0.875rem' }}>
+                      {(() => {
+                        const vals = investments.map(inv => inv.roiScenarios ? parseFloat(inv.roiScenarios.optimistic) : null).filter(v => v !== null && !isNaN(v));
+                        return vals.length ? `${(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                mt: 3, 
+                color: '#6B7280',
+                fontSize: '0.75rem'
+              }}
+            >
+              The Avg Yearly ROI shown on your portfolio is the average of the <b>realistic</b> ROI values across all your investments. Each investment's realistic ROI is estimated based on its type and data. The average is calculated as the sum of all realistic ROIs divided by the number of investments.
+            </Typography>
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 0 }}>
+            <Button 
+              onClick={() => setRoiModalOpen(false)} 
+              fullWidth
+              variant="contained"
+              sx={{
+                backgroundColor: '#8B5CF6',
+                color: '#ffffff',
+                borderRadius: '12px',
+                py: 1.5,
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                textTransform: 'none',
+                boxShadow: 'none',
+                '&:hover': {
+                  backgroundColor: '#7C3AED',
+                  boxShadow: 'none'
+                }
+              }}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
       <Footer />
     </Box>
   );
 };
 
-export default Portfolio; 
+export default Portfolio;
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Button,
   Dialog,
@@ -18,7 +18,11 @@ import {
   Checkbox,
   IconButton,
   Chip,
-  LinearProgress
+  LinearProgress,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
@@ -26,6 +30,10 @@ import ClearIcon from '@mui/icons-material/Clear';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import LockIcon from '@mui/icons-material/Lock';
+import DeleteIcon from '@mui/icons-material/Delete';
+
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 export default function FastAddPortfolio({ open, onClose, onAddInvestments, userProfile }) {
   const [selected, setSelected] = useState([]);
@@ -36,22 +44,58 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
   const [success, setSuccess] = useState('');
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
+  const [dragActive, setDragActive] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [sampleOpen, setSampleOpen] = useState(false);
 
   const handleFileChange = (e) => {
     const newFiles = Array.from(e.target.files);
     if (newFiles.length === 0) return;
+    processFiles(newFiles);
+  };
 
-    const updatedFiles = [...files, ...newFiles];
+  const processFiles = useCallback((newFiles) => {
+    // Filter for valid file types
+    const validFiles = newFiles.filter(file => {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      
+      if (!validTypes.includes(file.type)) {
+        setError(`Invalid file type: ${file.name}. Please upload PNG, JPG, or PDF files only.`);
+        return false;
+      }
+      
+      if (file.size > maxSize) {
+        setError(`File too large: ${file.name}. Maximum size is 10MB.`);
+        return false;
+      }
+      
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    const updatedFiles = [...files, ...validFiles];
+    if (updatedFiles.length > 5) {
+      setError('Maximum 5 files allowed. Please remove some files first.');
+      return;
+    }
+
     setFiles(updatedFiles);
+    setError('');
 
     const newPreviews = [];
     let loadedCount = 0;
-    newFiles.forEach(file => {
+    validFiles.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
-            newPreviews.push(reader.result);
+            newPreviews.push({
+              url: reader.result,
+              name: file.name,
+              size: file.size
+            });
             loadedCount++;
-            if (loadedCount === newFiles.length) {
+            if (loadedCount === validFiles.length) {
                 setPreviews(prev => [...prev, ...newPreviews]);
             }
         };
@@ -60,10 +104,40 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
 
     setInvestments([]);
     setSelected([]);
-    setError('');
     setSuccess('');
-    // Reset the file input value to allow selecting the same file again
-    e.target.value = null;
+  }, [files]);
+
+  const handleDrag = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      processFiles(Array.from(e.dataTransfer.files));
+    }
+  }, [processFiles]);
+
+  const removeFile = (index) => {
+    const newFiles = files.filter((_, i) => i !== index);
+    const newPreviews = previews.filter((_, i) => i !== index);
+    setFiles(newFiles);
+    setPreviews(newPreviews);
+    setError('');
+    
+    if (newFiles.length === 0) {
+      setInvestments([]);
+      setSelected([]);
+    }
   };
 
   const handleUpload = async () => {
@@ -72,6 +146,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
     setLoading(true);
     setError('');
     setSuccess('');
+    setProcessingProgress(0);
 
     try {
       // Process each file individually since the screenshot endpoint expects single files
@@ -110,8 +185,12 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
       };
 
       // Step 1: Extract investments from screenshots
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         console.log('Processing file:', file.name);
+        
+        // Update progress
+        setProcessingProgress((i / files.length) * 50);
         
         let fileData;
         try {
@@ -122,8 +201,13 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           try {
             fileData = await makeRequest('/api/screenshot', file);
           } catch (prodErr) {
-            console.error('Both local and production endpoints failed for file:', file.name, { local: err.message, production: prodErr.message });
-            throw new Error(`API endpoints unavailable for file ${file.name}. Please ensure the local server is running (npm run server) or try again later. Local error: ${err.message}`);
+            console.log('Production URL failed, trying Vercel fallback...', prodErr);
+            try {
+              fileData = await makeRequest('https://flow-invest2-hpr3.vercel.app/api/screenshot', file);
+            } catch (vercelErr) {
+              console.error('All endpoints failed for file:', file.name, { local: err.message, production: prodErr.message, vercel: vercelErr.message });
+              throw new Error(`API endpoints unavailable for file ${file.name}. Please ensure the local server is running (npm run server) or try again later. Local error: ${err.message}`);
+            }
           }
         }
 
@@ -141,13 +225,18 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
       }
 
       console.log('Extracted investments:', allInvestments);
+      setProcessingProgress(50);
 
       // Use correct API base for local vs production
       const apiBase = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
       // Step 2: Analyze investments with user profile using onboarding logic
       console.log('Analyzing investments with user profile using onboarding logic...');
       const analyzedInvestments = [];
-      for (const investment of allInvestments) {
+      for (let i = 0; i < allInvestments.length; i++) {
+        const investment = allInvestments[i];
+        // Update progress for analysis phase
+        setProcessingProgress(50 + (i / allInvestments.length) * 50);
+        
         // Only keep the basic fields for analysis, and default date to today if missing
         const { name, type, amount, date } = investment;
         const cleanInvestment = {
@@ -164,14 +253,27 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
         // Log what is being sent to /api/investment
         console.log('Sending to /api/investment:', cleanInvestment, userProfile);
         try {
-          const response = await fetch(`${apiBase}/api/investment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              investmentData: cleanInvestment,
-              userProfile: userProfile
-            })
-          });
+          let response;
+          try {
+            response = await fetch(`${apiBase}/api/investment`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                investmentData: cleanInvestment,
+                userProfile: userProfile
+              })
+            });
+          } catch (localErr) {
+            console.log('Local investment analysis failed, trying Vercel fallback...', localErr);
+            response = await fetch('https://flow-invest2-hpr3.vercel.app/api/investment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                investmentData: cleanInvestment,
+                userProfile: userProfile
+              })
+            });
+          }
           if (!response.ok) {
             throw new Error(`Analysis failed for ${cleanInvestment.name}: ${response.status}`);
           }
@@ -197,12 +299,14 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
       console.log('Analyzed investments:', analyzedInvestments);
       setInvestments(analyzedInvestments);
       setSelected(analyzedInvestments.map(() => true));
+      setProcessingProgress(100);
 
     } catch (err) {
       console.error('Error analyzing portfolio:', err);
       setError(err.message || 'Failed to analyze portfolio');
     } finally {
       setLoading(false);
+      setProcessingProgress(0);
     }
   };
 
@@ -255,11 +359,20 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
     setSelected([]);
     setError('');
     setSuccess('');
+    setProcessingProgress(0);
   };
 
   const handleClose = () => {
     handleClear();
     onClose();
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -290,10 +403,10 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
         <Box display="flex" justifyContent="space-between" alignItems="center">
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-              Fast Add Portfolio
+              Quick-Import Portfolio (straight from your broker)
             </Typography>
             <Typography variant="body2" sx={{ opacity: 0.9 }}>
-              Upload screenshots to quickly analyze and add multiple investments
+              Drop a screenshot of your holdings—we'll auto-fill the assets for you.
             </Typography>
           </Box>
           <IconButton 
@@ -314,87 +427,95 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
       </DialogTitle>
 
       <DialogContent sx={{ p: 4 }}>
-        {/* Upload Section */}
-        <Box sx={{ 
-          textAlign: 'center', 
-          p: previews.length === 0 ? 6 : 3,
-          background: previews.length === 0 ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'rgba(248, 250, 252, 0.8)',
-          borderRadius: '16px',
-          border: previews.length === 0 ? '2px dashed rgba(102, 126, 234, 0.3)' : '1px solid rgba(226, 232, 240, 0.8)',
-          mb: 3,
-          mt: 2
-        }}>
-          <Button
-            variant="contained"
-            component="label"
-            startIcon={<CloudUploadIcon />}
-            disabled={loading}
-            sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              borderRadius: '16px',
-              py: 2,
-              px: 4,
-              mb: 2,
-              fontWeight: 600,
-              textTransform: 'none',
-              fontSize: '1rem',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
-              },
-              '&:disabled': {
-                background: 'rgba(100, 116, 139, 0.3)',
-                transform: 'none',
-                boxShadow: 'none'
-              },
-              transition: 'all 0.3s ease'
-            }}
-          >
-            {previews.length === 0 ? 'Upload Screenshot(s)' : 'Add More Screenshots'}
-            <input 
-              type="file" 
-              multiple
-              hidden 
-              onChange={handleFileChange} 
-              accept="image/*" 
-            />
-          </Button>
-
-          <Typography 
-            variant="caption" 
+        {/* Upload Zone */}
+        <Box 
+          onDragEnter={handleDrag}
+          onDragLeave={handleDrag}
+          onDragOver={handleDrag}
+          onDrop={handleDrop}
+          sx={{ 
+            textAlign: 'center', 
+            p: 6,
+            background: dragActive 
+              ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)' 
+              : 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
+            borderRadius: '16px',
+            border: dragActive 
+              ? '2px dashed rgba(102, 126, 234, 0.6)' 
+              : '2px dashed rgba(102, 126, 234, 0.3)',
+            mb: 3,
+            mt: 2,
+            transition: 'all 0.3s ease',
+            cursor: 'pointer',
+            '&:hover': {
+              background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)',
+              border: '2px dashed rgba(102, 126, 234, 0.5)'
+            }
+          }}
+          onClick={() => document.getElementById('file-input').click()}
+        >
+          <CloudUploadIcon 
             sx={{ 
+              fontSize: 48, 
+              color: '#667eea', 
               mb: 2,
-              color: '#10b981',
+              opacity: dragActive ? 0.8 : 1
+            }} 
+          />
+          
+          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+            📥 Drag & drop or click to upload
+          </Typography>
+          
+          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+            PNG, JPG or PDF · Max 10 MB · Up to 5 files
+          </Typography>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+            <LockIcon sx={{ fontSize: 16, color: '#10b981', mr: 1 }} />
+            <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
+              Images processed locally — nothing ever leaves your browser.
+            </Typography>
+          </Box>
+
+          {/* See a sample screenshot button */}
+          <Button
+            variant="text"
+            startIcon={<HelpOutlineIcon />}
+            sx={{
+              color: '#667eea',
+              textTransform: 'none',
+              fontSize: '0.85rem',
               fontWeight: 600,
-              background: 'rgba(16, 185, 129, 0.1)',
-              borderRadius: '8px',
-              py: 1,
-              px: 2,
-              display: 'inline-block'
+              mb: 1,
+              '&:hover': {
+                background: 'rgba(102, 126, 234, 0.08)'
+              }
+            }}
+            onClick={e => {
+              e.stopPropagation();
+              setSampleOpen(true);
             }}
           >
-            🔒 Your screenshots are never stored anywhere
-          </Typography>
-
-          {previews.length === 0 && (
-            <Typography variant="body1" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-              Upload one or more screenshots of your portfolio (e.g., from your broker) showing the name and amount of each asset.
-            </Typography>
-          )}
+            See a sample screenshot
+          </Button>
           
-          {previews.length > 0 && (
-            <Typography variant="body2" sx={{ color: '#64748b', lineHeight: 1.6 }}>
-              You can add more screenshots or click "Analyze Portfolio" to process your current uploads.
-            </Typography>
-          )}
+          <input 
+            id="file-input"
+            type="file" 
+            multiple
+            hidden 
+            onChange={handleFileChange} 
+            accept="image/png,image/jpeg,image/jpg,application/pdf" 
+          />
         </Box>
 
-        {/* Preview Section */}
+        {/* File List - Only show after files are selected */}
         {previews.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
               <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                Portfolio Previews ({previews.length})
+                Uploaded Files ({previews.length})
               </Typography>
               <Button 
                 startIcon={<ClearIcon />} 
@@ -415,94 +536,88 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
             </Box>
             
             <Paper sx={{
-              p: 2,
               background: 'rgba(248, 250, 252, 0.8)',
               border: '1px solid rgba(226, 232, 240, 0.8)',
-              borderRadius: '12px'
+              borderRadius: '12px',
+              overflow: 'hidden'
             }}>
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 2, 
-                overflowX: 'auto', 
-                pb: 1,
-                '&::-webkit-scrollbar': {
-                  height: 6
-                },
-                '&::-webkit-scrollbar-track': {
-                  background: 'rgba(0,0,0,0.1)',
-                  borderRadius: 3
-                },
-                '&::-webkit-scrollbar-thumb': {
-                  background: 'rgba(102, 126, 234, 0.5)',
-                  borderRadius: 3
-                }
-              }}>
-                {previews.map((previewUrl, index) => (
-                  <Box
+              <List sx={{ p: 0 }}>
+                {previews.map((preview, index) => (
+                  <ListItem 
                     key={index}
                     sx={{
-                      position: 'relative',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                      transition: 'transform 0.2s ease',
+                      borderBottom: index < previews.length - 1 ? '1px solid rgba(226, 232, 240, 0.8)' : 'none',
                       '&:hover': {
-                        transform: 'scale(1.05)'
+                        background: 'rgba(102, 126, 234, 0.05)'
                       }
                     }}
                   >
-                    <img
-                      src={previewUrl}
-                      alt={`Portfolio preview ${index + 1}`}
-                      style={{ 
-                        height: '120px', 
-                        borderRadius: '8px',
-                        objectFit: 'cover'
+                    <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+                      <img
+                        src={preview.url}
+                        alt={`Preview ${index + 1}`}
+                        style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          borderRadius: '6px',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </Box>
+                    <ListItemText
+                      primary={preview.name}
+                      secondary={formatFileSize(preview.size)}
+                      primaryTypographyProps={{
+                        sx: { fontWeight: 600, color: '#1e293b' }
+                      }}
+                      secondaryTypographyProps={{
+                        sx: { color: '#64748b', fontSize: '0.875rem' }
                       }}
                     />
-                    <Chip
-                      label={`${index + 1}`}
-                      size="small"
-                      sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        background: 'rgba(255,255,255,0.9)',
-                        fontWeight: 600
-                      }}
-                    />
-                  </Box>
+                    <ListItemSecondaryAction>
+                      <IconButton
+                        edge="end"
+                        onClick={() => removeFile(index)}
+                        sx={{
+                          color: '#ef4444',
+                          '&:hover': {
+                            background: 'rgba(239, 68, 68, 0.1)'
+                          }
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </ListItemSecondaryAction>
+                  </ListItem>
                 ))}
-              </Box>
+              </List>
             </Paper>
           </Box>
         )}
 
-        {/* Loading State */}
+        {/* Processing Progress */}
         {loading && (
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: 'column',
-            alignItems: 'center',
-            py: 6,
-            background: 'rgba(102, 126, 234, 0.05)',
-            borderRadius: '16px',
-            mb: 3
-          }}>
-            <CircularProgress 
-              size={60}
-              thickness={4}
+          <Box sx={{ mb: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                Processing files...
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#64748b' }}>
+                {Math.round(processingProgress)}%
+              </Typography>
+            </Box>
+            <LinearProgress 
+              variant="determinate" 
+              value={processingProgress}
               sx={{ 
-                color: '#667eea',
-                mb: 2
-              }}
+                height: 8,
+                borderRadius: 4,
+                '& .MuiLinearProgress-bar': {
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: 4
+                }
+              }} 
             />
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-              Analyzing Portfolio...
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Our AI is processing your screenshots
-            </Typography>
           </Box>
         )}
 
@@ -516,7 +631,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
             borderRadius: '12px'
           }}>
             <Typography variant="body1" sx={{ color: '#dc2626', fontWeight: 600 }}>
-              ⚠️ Analysis Error
+              ⚠️ Upload Error
             </Typography>
             <Typography variant="body2" sx={{ color: '#7f1d1d', mt: 1 }}>
               {error}
@@ -703,6 +818,10 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
             (loading || addLoading) ? null : 
             investments.length > 0 ? <AddIcon /> : <AnalyticsIcon />
           }
+          endIcon={
+            !loading && !addLoading && investments.length === 0 ? 
+            <span style={{ fontSize: '14px' }}>▶</span> : null
+          }
           sx={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             borderRadius: '12px',
@@ -771,6 +890,23 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           />
         </Box>
       )}
+
+      {/* Sample Screenshot Modal */}
+      <Dialog open={sampleOpen} onClose={() => setSampleOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+          <span>Sample Screenshot</span>
+          <IconButton onClick={() => setSampleOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 2 }}>
+          <img
+            src="/sample-screenshot.jpg"
+            alt="Sample screenshot"
+            style={{ maxWidth: '100%', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,0.10)' }}
+          />
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

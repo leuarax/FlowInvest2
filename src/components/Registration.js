@@ -9,7 +9,9 @@ import {
   IconButton,
   InputAdornment,
   Fade,
-  Alert
+  Alert,
+  CircularProgress,
+  Link
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -21,11 +23,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { saveInvestment as firebaseSaveInvestment } from '../utils/firebase';
 import { analyzeInvestment } from '../utils/openai';
 
-// Global variable to persist registration error across component re-mounts
-let globalRegistrationError = '';
-
 const Registration = () => {
-  const { signUp, updateUserProfile } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -39,7 +38,6 @@ const Registration = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Get onboarding data from localStorage
     const savedProfile = localStorage.getItem('userProfile');
     if (savedProfile) {
       // setOnboardingData(JSON.parse(savedProfile));
@@ -52,17 +50,14 @@ const Registration = () => {
       ...formData,
       [name]: value,
     });
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors({
         ...errors,
         [name]: '',
       });
     }
-    // Clear auth error when user starts typing
     if (error) {
       setError('');
-      globalRegistrationError = '';
     }
   };
 
@@ -102,75 +97,50 @@ const Registration = () => {
 
     setLoading(true);
     setError('');
-    globalRegistrationError = '';
 
     try {
-      console.log('Starting registration process...');
-      
-      // Get onboarding data from localStorage if available
       const onboardingData = localStorage.getItem('onboardingData');
       const parsedOnboardingData = onboardingData ? JSON.parse(onboardingData) : null;
       
-      console.log('Onboarding data:', parsedOnboardingData);
-
-      // Use email as display name if no name is provided in onboarding data
       const displayName = parsedOnboardingData?.displayName || parsedOnboardingData?.name || formData.email.split('@')[0];
 
-      const { user, error } = await signUp(
+      const { user, error: authError } = await signUp(
         formData.email, 
         formData.password, 
         displayName,
         parsedOnboardingData
       );
       
-      if (error) {
-        console.error('Registration error:', error);
-        
-        // Handle specific Firebase errors
+      if (authError) {
         let errorMessage = '';
-        if (error.code === 'auth/email-already-in-use') {
+        if (authError.code === 'auth/email-already-in-use') {
           errorMessage = 'This email is already registered. Please try logging in instead.';
-        } else if (error.code === 'auth/weak-password') {
+        } else if (authError.code === 'auth/weak-password') {
           errorMessage = 'Password is too weak. Please choose a stronger password.';
-        } else if (error.code === 'auth/invalid-email') {
+        } else if (authError.code === 'auth/invalid-email') {
           errorMessage = 'Please enter a valid email address.';
-        } else if (error.code === 'auth/operation-not-allowed') {
+        } else if (authError.code === 'auth/operation-not-allowed') {
           errorMessage = 'Email/password accounts are not enabled. Please contact support.';
         } else {
-          errorMessage = error.message || 'Registration failed. Please try again.';
+          errorMessage = authError.message || 'Registration failed. Please try again.';
         }
         
-        // Set error in global variable and state
-        globalRegistrationError = errorMessage;
         setError(errorMessage);
         return;
       }
 
       if (user) {
-        console.log('Registration successful, user created:', user);
-        // Set flag for dashboard to trigger analysis on first load
         localStorage.setItem('needsPortfolioAnalysis', 'true');
-        // If there's portfolio analysis from onboarding, save it and the investments
         if (parsedOnboardingData?.portfolioAnalysis) {
-          console.log('Found portfolio analysis in onboarding data:', parsedOnboardingData.portfolioAnalysis);
-          console.log('Investments to save:', parsedOnboardingData.portfolioAnalysis.investments);
-          
-          // Save investments first, even if analysis fails
           if (parsedOnboardingData.portfolioAnalysis.investments && parsedOnboardingData.portfolioAnalysis.investments.length > 0) {
-            console.log('Saving investments for user:', user.uid);
-            console.log('Number of investments to save:', parsedOnboardingData.portfolioAnalysis.investments.length);
-            
             for (const investment of parsedOnboardingData.portfolioAnalysis.investments) {
-              console.log('Processing investment:', investment);
-              
               try {
-                // Get detailed analysis for each investment (same as Dashboard)
                 const analysis = await analyzeInvestment(
                   {
                     ...investment,
                     type: investment.type || 'Stock',
                     name: investment.name || 'Unnamed Investment',
-                    duration: 'Long-term' // Default duration for analysis
+                    duration: 'Long-term' 
                   },
                   {
                     experience: parsedOnboardingData.experience,
@@ -180,7 +150,6 @@ const Registration = () => {
                   }
                 );
                 
-                // Merge the analysis with the investment data
                 const investmentWithAnalysis = {
                   ...investment,
                   roiScenarios: analysis.roiScenarios || {
@@ -194,18 +163,13 @@ const Registration = () => {
                   explanation: analysis.explanation || 'Investment from onboarding'
                 };
                 
-                console.log('Investment with detailed analysis:', investmentWithAnalysis);
-                
-                const { id, error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithAnalysis);
+                const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithAnalysis);
                 if (investmentError) {
                   console.error('Error saving onboarding investment:', investmentError);
-                } else {
-                  console.log('Successfully saved investment:', investment.name, 'with ID:', id);
                 }
               } catch (analysisError) {
                 console.error('Error analyzing investment during registration:', analysisError);
                 
-                // Fallback to basic analysis if detailed analysis fails
                 const investmentWithBasicAnalysis = {
                   ...investment,
                   grade: parsedOnboardingData.portfolioAnalysis.grade || 'B',
@@ -219,70 +183,26 @@ const Registration = () => {
                   explanation: parsedOnboardingData.portfolioAnalysis.summary || 'Investment from onboarding (basic analysis)'
                 };
                 
-                const { id, error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithBasicAnalysis);
+                const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithBasicAnalysis);
                 if (investmentError) {
                   console.error('Error saving onboarding investment with basic analysis:', investmentError);
-                } else {
-                  console.log('Successfully saved investment with basic analysis:', investment.name, 'with ID:', id);
                 }
               }
             }
-          } else {
-            console.log('No investments found in portfolio analysis');
           }
-          // Store expected investment count in localStorage
           if (parsedOnboardingData && parsedOnboardingData.portfolioAnalysis && Array.isArray(parsedOnboardingData.portfolioAnalysis.investments)) {
             localStorage.setItem('expectedInvestmentCount', parsedOnboardingData.portfolioAnalysis.investments.length.toString());
           }
           
-          try {
-            // Get the full analysis for the user's portfolio
-            const fullAnalysisResponse = await fetch('/api/analyze-portfolio', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                investments: parsedOnboardingData.portfolioAnalysis.investments || [],
-                userProfile: {
-                  experience: parsedOnboardingData.experience,
-                  riskTolerance: parsedOnboardingData.riskTolerance,
-                  interests: parsedOnboardingData.interests,
-                  primaryGoal: parsedOnboardingData.primaryGoal
-                },
-                preview: false
-              }),
-            });
-
-            if (fullAnalysisResponse.ok) {
-              const fullAnalysis = await fullAnalysisResponse.json();
-              console.log('Full analysis received:', fullAnalysis);
-              
-              // Save the full analysis to the user's profile
-              await updateUserProfile({
-                portfolioAnalysis: fullAnalysis
-              });
-            } else {
-              console.error('Failed to get full analysis:', fullAnalysisResponse.status, fullAnalysisResponse.statusText);
-            }
-          } catch (analysisError) {
-            console.error('Error saving portfolio analysis:', analysisError);
-            // Don't fail registration if analysis saving fails
-          }
-        } else {
-          console.log('No portfolio analysis found in onboarding data');
+          // Don't run portfolio analysis here - let Dashboard handle it after all investments are loaded
+          // The Dashboard will trigger analysis once all investments are saved and loaded
         }
         
-        // Clear onboarding data from localStorage
         localStorage.removeItem('onboardingData');
-        globalRegistrationError = '';
         navigate('/verify-email');
       }
-    } catch (error) {
-      console.error('Unexpected registration error:', error);
-      const errorMessage = 'An unexpected error occurred. Please try again.';
-      globalRegistrationError = errorMessage;
-      setError(errorMessage);
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -291,7 +211,7 @@ const Registration = () => {
   return (
     <Box sx={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      backgroundColor: '#ffffff',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -299,66 +219,46 @@ const Registration = () => {
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Animated Background Elements */}
-      <Box sx={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        opacity: 0.1,
-        background: `
-          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-          radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.2) 0%, transparent 50%),
-          radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.2) 0%, transparent 50%)
-        `
-      }} />
-
       <Container maxWidth="sm" sx={{ position: 'relative', zIndex: 1 }}>
         <Fade in timeout={800}>
           <Paper sx={{
             p: 4,
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '24px',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.3)'
+            backgroundColor: '#F9FAFB',
+            borderRadius: '16px',
+            boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+            border: '1px solid #E5E7EB'
           }}>
             {/* Header */}
             <Box sx={{ textAlign: 'center', mb: 4 }}>
               <Typography 
-                variant="h3" 
+                variant="h4" 
+                component="h1"
                 sx={{ 
-                  fontWeight: 800,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  backgroundClip: 'text',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  mb: 1
+                  fontWeight: 700,
+                  color: '#1F2937',
+                  mb: 1,
+                  fontSize: { xs: '1.5rem', sm: '2rem' }
                 }}
               >
                 Create Your Account
               </Typography>
-              <Typography variant="body1" sx={{ color: '#64748b' }}>
-                Complete your FlowInvest registration
+              <Typography variant="body1" sx={{ color: '#6B7280' }}>
+                Join FlowInvest and start your journey
               </Typography>
             </Box>
 
-
-
             {/* Error Alert */}
-            {globalRegistrationError && (
+            {error && (
               <Alert 
                 severity="error" 
                 sx={{ 
                   mb: 3, 
-                  borderRadius: '12px',
-                  background: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  color: '#b91c1c'
+                  borderRadius: '8px',
+                  backgroundColor: '#FEF2F2',
+                  color: '#DC2626'
                 }}
               >
-                {globalRegistrationError}
+                {error}
               </Alert>
             )}
 
@@ -377,7 +277,7 @@ const Registration = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <EmailIcon sx={{ color: '#667eea' }} />
+                      <EmailIcon sx={{ color: '#9CA3AF' }} />
                     </InputAdornment>
                   ),
                 }}
@@ -385,13 +285,22 @@ const Registration = () => {
                   mb: 3,
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '12px',
-                    background: 'rgba(248, 250, 252, 0.8)',
+                    backgroundColor: '#ffffff',
+                    '& fieldset': {
+                      borderColor: '#E5E7EB',
+                    },
                     '&:hover fieldset': {
-                      borderColor: '#667eea'
+                      borderColor: '#D1D5DB',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#667eea'
-                    }
+                      borderColor: '#8B5CF6',
+                    },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6B7280',
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#1F2937',
                   }
                 }}
               />
@@ -409,7 +318,7 @@ const Registration = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LockIcon sx={{ color: '#667eea' }} />
+                      <LockIcon sx={{ color: '#9CA3AF' }} />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -418,6 +327,7 @@ const Registration = () => {
                         aria-label="toggle password visibility"
                         onClick={() => setShowPassword((show) => !show)}
                         edge="end"
+                        sx={{ color: '#9CA3AF' }}
                       >
                         {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
@@ -428,13 +338,22 @@ const Registration = () => {
                   mb: 3,
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '12px',
-                    background: 'rgba(248, 250, 252, 0.8)',
+                    backgroundColor: '#ffffff',
+                    '& fieldset': {
+                      borderColor: '#E5E7EB',
+                    },
                     '&:hover fieldset': {
-                      borderColor: '#667eea'
+                      borderColor: '#D1D5DB',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#667eea'
-                    }
+                      borderColor: '#8B5CF6',
+                    },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6B7280',
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#1F2937',
                   }
                 }}
               />
@@ -452,7 +371,7 @@ const Registration = () => {
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <LockIcon sx={{ color: '#667eea' }} />
+                      <LockIcon sx={{ color: '#9CA3AF' }} />
                     </InputAdornment>
                   ),
                   endAdornment: (
@@ -461,6 +380,7 @@ const Registration = () => {
                         aria-label="toggle confirm password visibility"
                         onClick={() => setShowConfirmPassword((show) => !show)}
                         edge="end"
+                        sx={{ color: '#9CA3AF' }}
                       >
                         {showConfirmPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
                       </IconButton>
@@ -471,13 +391,22 @@ const Registration = () => {
                   mb: 3,
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '12px',
-                    background: 'rgba(248, 250, 252, 0.8)',
+                    backgroundColor: '#ffffff',
+                    '& fieldset': {
+                      borderColor: '#E5E7EB',
+                    },
                     '&:hover fieldset': {
-                      borderColor: '#667eea'
+                      borderColor: '#D1D5DB',
                     },
                     '&.Mui-focused fieldset': {
-                      borderColor: '#667eea'
-                    }
+                      borderColor: '#8B5CF6',
+                    },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6B7280',
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#1F2937',
                   }
                 }}
               />
@@ -485,47 +414,48 @@ const Registration = () => {
               <Button
                 type="submit"
                 variant="contained"
-                color="primary"
                 fullWidth
                 disabled={loading}
                 sx={{
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
                   borderRadius: '12px',
                   py: 1.5,
-                  fontWeight: 700,
-                  fontSize: '1.1rem',
+                  fontWeight: 600,
                   textTransform: 'none',
-                  boxShadow: '0 4px 20px rgba(102, 126, 234, 0.15)',
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  boxShadow: 'none',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
-                    transform: 'translateY(-2px)'
+                    backgroundColor: '#7C3AED',
+                    boxShadow: 'none'
                   },
-                  transition: 'all 0.3s ease'
+                  '&:disabled': {
+                    backgroundColor: '#E5E7EB',
+                    color: '#9CA3AF'
+                  }
                 }}
               >
-                {loading ? 'Creating Account...' : 'Create Account'}
+                {loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Create Account'}
               </Button>
             </Box>
 
             {/* Sign In Link */}
-            <Box sx={{ textAlign: 'center', mt: 3 }}>
-              <Typography variant="body2" sx={{ color: '#64748b', mb: 1 }}>
-                Already have an account?
+            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid #E5E7EB', textAlign: 'center' }}>
+              <Typography variant="body2" sx={{ color: '#9CA3AF' }}>
+                Already have an account?{' '}
+                <Link 
+                  href="/login" 
+                  sx={{ 
+                    color: '#8B5CF6', 
+                    fontWeight: 600, 
+                    textDecoration: 'none',
+                    '&:hover': {
+                      textDecoration: 'underline'
+                    }
+                  }}
+                >
+                  Sign In
+                </Link>
               </Typography>
-              <Button
-                variant="text"
-                onClick={() => navigate('/login')}
-                sx={{
-                  color: '#667eea',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': {
-                    background: 'rgba(102, 126, 234, 0.1)'
-                  }
-                }}
-              >
-                Sign In
-              </Button>
             </Box>
           </Paper>
         </Fade>
@@ -534,4 +464,5 @@ const Registration = () => {
   );
 };
 
-export default Registration; 
+export default Registration;
+

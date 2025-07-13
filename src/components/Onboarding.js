@@ -14,7 +14,8 @@ import {
   Paper,
   Select,
   MenuItem,
-  FormHelperText
+  FormHelperText,
+  InputAdornment
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +25,10 @@ import { db } from '../utils/firebase';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { saveInvestment } from '../utils/firebase';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import InsightsIcon from '@mui/icons-material/Insights';
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -35,7 +40,7 @@ const Onboarding = () => {
     experience: '',
     riskTolerance: '',
     referralSource: '',
-    referralOther: '', // <-- add this line
+    referralOther: '',
     interests: [],
     primaryGoal: '',
     screenshotFile: null,
@@ -44,28 +49,22 @@ const Onboarding = () => {
     analysisLoading: false,
   });
 
-
-
-  const getGradeGradient = (grade) => {
-    if (!grade) return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+  const getGradeColor = (grade) => {
+    if (!grade) return '#6B7280'; // Gray for N/A
     const upperGrade = grade.toUpperCase();
-    if (upperGrade.startsWith('A')) return 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-    if (upperGrade.startsWith('B')) return 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
-    if (upperGrade.startsWith('C')) return 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)';
-    if (upperGrade.startsWith('D')) return 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
-    if (upperGrade.startsWith('F')) return 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)';
-    return 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+    if (upperGrade.startsWith('A')) return '#10B981'; // Green
+    if (upperGrade.startsWith('B')) return '#F59E0B'; // Amber
+    if (upperGrade.startsWith('C')) return '#F97316'; // Orange
+    if (upperGrade.startsWith('D')) return '#EF4444'; // Red
+    if (upperGrade.startsWith('F')) return '#DC2626'; // Darker Red
+    return '#6B7280';
   };
 
-  // Check if user is already logged in and log them out
   useEffect(() => {
     if (user) {
-      console.log('User is already logged in, logging out for onboarding');
       signOut().then(() => {
-        // Clear any existing onboarding data
         localStorage.removeItem('onboardingData');
         localStorage.removeItem('userProfile');
-        console.log('User logged out for onboarding');
       }).catch((error) => {
         console.error('Error logging out for onboarding:', error);
       });
@@ -98,17 +97,17 @@ const Onboarding = () => {
     {
       title: "Smart Portfolio Analysis",
       description: "Get AI-powered insights into your investment portfolio with detailed risk assessment and performance analysis.",
-      icon: "📊"
+      icon: <AnalyticsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
     },
     {
-      title: "Personalized Investment Strategy",
+      title: "Personalized Strategy",
       description: "Receive tailored investment recommendations based on your risk tolerance, goals, and market conditions.",
-      icon: "🎯"
+      icon: <InsightsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
     },
     {
-      title: "Portfolio Stress Test with Scenarios",
+      title: "Portfolio Stress Test",
       description: "Test your portfolio against various market scenarios to understand potential risks and prepare for different economic conditions.",
-      icon: "🧪"
+      icon: <TrendingUpIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
     }
   ];
 
@@ -120,16 +119,31 @@ const Onboarding = () => {
     });
   };
 
+  const handleInterestChange = (interest) => {
+    setFormData(prevData => {
+      const isChecked = prevData.interests.includes(interest);
+      if (isChecked) {
+        return {
+          ...prevData,
+          interests: prevData.interests.filter(item => item !== interest)
+        };
+      } else {
+        return {
+          ...prevData,
+          interests: [...prevData.interests, interest]
+        };
+      }
+    });
+  };
+
   const saveReferralSource = async () => {
     try {
-      console.log('Saving referral source to Firebase:', formData.referralSource);
       await addDoc(collection(db, 'referral_sources'), {
         source: formData.referralSource,
         timestamp: new Date(),
         userAgent: navigator.userAgent,
-        ipAddress: 'anonymous' // We don't collect IP for privacy
+        ipAddress: 'anonymous'
       });
-      console.log('Referral source saved successfully');
     } catch (error) {
       console.error('Error saving referral source:', error);
     }
@@ -152,10 +166,8 @@ const Onboarding = () => {
     setFormData(prev => ({ ...prev, analysisLoading: true }));
     
     try {
-      // 1. Upload the screenshot to /api/screenshot to extract investments
       const screenshotFormData = new FormData();
-      console.log('screenshotFile:', formData.screenshotFile); // Debug log to check file before sending
-      screenshotFormData.append('screenshot', formData.screenshotFile); // Field name must be 'screenshot'
+      screenshotFormData.append('screenshot', formData.screenshotFile);
       let recognitionResponse;
       try {
         recognitionResponse = await fetch('http://localhost:3001/api/batch-screenshot', {
@@ -163,20 +175,25 @@ const Onboarding = () => {
           body: screenshotFormData,
         });
       } catch (error) {
-        console.log('Local server failed for batch-screenshot, trying fallback endpoint...', error);
-        recognitionResponse = await fetch('/api/batch-screenshot', {
-          method: 'POST',
-          body: screenshotFormData,
-        });
+        try {
+          recognitionResponse = await fetch('/api/batch-screenshot', {
+            method: 'POST',
+            body: screenshotFormData,
+          });
+        } catch (prodErr) {
+          console.log('Production URL failed, trying Vercel fallback...', prodErr);
+          recognitionResponse = await fetch('https://flow-invest2-hpr3.vercel.app/api/batch-screenshot', {
+            method: 'POST',
+            body: screenshotFormData,
+          });
+        }
       }
       if (!recognitionResponse.ok) {
         const errorText = await recognitionResponse.text();
-        console.error('Screenshot recognition failed:', recognitionResponse.status, errorText);
         throw new Error(`Failed to recognize screenshot: ${recognitionResponse.status} - ${errorText}`);
       }
       const recognitionJson = await recognitionResponse.json();
       let recognizedInvestments = recognitionJson.data || [];
-      // Normalize to array (like in normal portfolio analysis)
       if (recognizedInvestments && !Array.isArray(recognizedInvestments)) {
         recognizedInvestments = [recognizedInvestments];
       }
@@ -191,11 +208,9 @@ const Onboarding = () => {
           for (const inv of recognizedInvestments) {
             await saveInvestment(userId, inv);
           }
-          // Store expected investment count in localStorage
           localStorage.setItem('expectedInvestmentCount', recognizedInvestments.length.toString());
         }
       }
-      // 3. Call /api/analyze-portfolio with the recognized investments and preview=true
       const previewFormData = new FormData();
       previewFormData.append('investments', JSON.stringify(recognizedInvestments));
       previewFormData.append('userProfile', JSON.stringify({
@@ -212,11 +227,18 @@ const Onboarding = () => {
           body: previewFormData,
         });
       } catch (error) {
-        console.log('Local server failed for analyze-portfolio, trying fallback endpoint...', error);
-        previewAnalysis = await fetch('/api/analyze-portfolio', {
-          method: 'POST',
-          body: previewFormData,
-        });
+        try {
+          previewAnalysis = await fetch('/api/analyze-portfolio', {
+            method: 'POST',
+            body: previewFormData,
+          });
+        } catch (prodErr) {
+          console.log('Production URL failed, trying Vercel fallback...', prodErr);
+          previewAnalysis = await fetch('https://flow-invest2-hpr3.vercel.app/api/analyze-portfolio', {
+            method: 'POST',
+            body: previewFormData,
+          });
+        }
       }
       if (previewAnalysis.ok) {
         const previewData = await previewAnalysis.json();
@@ -224,13 +246,12 @@ const Onboarding = () => {
           ...prev, 
           portfolioAnalysis: {
             ...previewData,
-            investments: recognizedInvestments // Save the investments for later use
+            investments: recognizedInvestments
           },
           analysisLoading: false 
         }));
       } else {
         const errorText = await previewAnalysis.text();
-        console.error('Preview analysis failed:', previewAnalysis.status, errorText);
         throw new Error(`Failed to get preview analysis: ${previewAnalysis.status} - ${errorText}`);
       }
     } catch (error) {
@@ -240,23 +261,20 @@ const Onboarding = () => {
   };
 
   const handleNext = async () => {
-    console.log('handleNext called, currentStep:', currentStep, 'formData:', formData);
-    
-    // Validate current step before proceeding
     if (currentStep === 0 && !formData.name) {
-      console.log('Step 0 validation failed: no name');
+      alert('Please enter your name.');
       return;
     }
     if (currentStep === 1 && !formData.experience) {
-      console.log('Step 1 validation failed: no experience');
+      alert('Please select your investment experience.');
       return;
     }
     if (currentStep === 2 && !formData.riskTolerance) {
-      console.log('Step 2 validation failed: no risk tolerance');
+      alert('Please select your risk tolerance.');
       return;
     }
     if (currentStep === 3 && !formData.referralSource) {
-      console.log('Step 3 validation failed: no referral source');
+      alert('Please select how you heard about us.');
       return;
     }
     if (currentStep === 4 && formData.interests.length === 0) {
@@ -267,13 +285,10 @@ const Onboarding = () => {
       alert('Please enter your investment goals.');
       return;
     }
-    // Save referral source after risk tolerance (step 2)
     if (currentStep === 2) {
-      console.log('Saving referral source...');
       await saveReferralSource();
     }
 
-    console.log('Moving to next step:', currentStep + 1);
     setCurrentStep(currentStep + 1);
   };
 
@@ -288,27 +303,43 @@ const Onboarding = () => {
       case 0:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-              Tell us about yourself
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
+              What's your name?
             </Typography>
             <TextField
               fullWidth
               name="name"
-              label="What's your name?"
+              label="Your Name"
               value={formData.name}
               onChange={handleInputChange}
               variant="outlined"
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutlineIcon sx={{ color: '#9CA3AF' }} />
+                  </InputAdornment>
+                ),
+              }}
               sx={{
                 mb: 4,
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '12px',
-                  background: 'rgba(248, 250, 252, 0.8)',
+                  backgroundColor: '#ffffff',
+                  '& fieldset': {
+                    borderColor: '#E5E7EB',
+                  },
                   '&:hover fieldset': {
-                    borderColor: '#667eea'
+                    borderColor: '#D1D5DB',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#667eea'
-                  }
+                    borderColor: '#8B5CF6',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#6B7280',
+                },
+                '& .MuiInputBase-input': {
+                  color: '#1F2937',
                 }
               }}
             />
@@ -318,7 +349,7 @@ const Onboarding = () => {
       case 1:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
               Your Investment Experience
             </Typography>
             <FormControl component="fieldset" sx={{ mt: 2, width: '100%' }}>
@@ -333,28 +364,27 @@ const Onboarding = () => {
                     sx={{
                       mb: 2,
                       p: 2,
-                      background: formData.experience === option.value ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'rgba(255,255,255,0.8)',
-                      backdropFilter: 'blur(10px)',
+                      backgroundColor: formData.experience === option.value ? '#F3EBFF' : '#ffffff',
                       border: '1px solid',
-                      borderColor: formData.experience === option.value ? '#667eea' : 'rgba(255,255,255,0.3)',
-                      borderRadius: '16px',
-                      boxShadow: formData.experience === option.value ? '0 8px 25px rgba(102, 126, 234, 0.2)' : '0 4px 12px rgba(0,0,0,0.05)',
-                      transition: 'all 0.3s ease',
+                      borderColor: formData.experience === option.value ? '#8B5CF6' : '#E5E7EB',
+                      borderRadius: '12px',
+                      boxShadow: formData.experience === option.value ? '0 4px 12px rgba(139, 92, 246, 0.1)' : 'none',
+                      transition: 'all 0.2s ease-in-out',
                       '&:hover': {
-                        transform: 'translateY(-2px)',
-                        boxShadow: '0 8px 25px rgba(102, 126, 234, 0.2)'
+                        borderColor: '#8B5CF6',
+                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.05)'
                       }
                     }}
                   >
                     <FormControlLabel
                       value={option.value}
-                      control={<Radio sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }} />}
+                      control={<Radio sx={{ color: '#8B5CF6', '&.Mui-checked': { color: '#8B5CF6' } }} />}
                       label={
                         <Box>
-                          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                          <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
                             {option.label}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: '#64748b' }}>
+                          <Typography variant="body2" sx={{ color: '#6B7280' }}>
                             {option.description}
                           </Typography>
                         </Box>
@@ -371,7 +401,7 @@ const Onboarding = () => {
       case 2:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
               What's your risk tolerance?
             </Typography>
             <Box sx={{ mt: 2 }}>
@@ -381,16 +411,15 @@ const Onboarding = () => {
                   sx={{
                     mb: 2,
                     p: 2,
-                    background: formData.riskTolerance === option.value ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'rgba(255,255,255,0.8)',
-                    backdropFilter: 'blur(10px)',
+                    backgroundColor: formData.riskTolerance === option.value ? '#F3EBFF' : '#ffffff',
                     border: '1px solid',
-                    borderColor: formData.riskTolerance === option.value ? '#667eea' : 'rgba(255,255,255,0.3)',
-                    borderRadius: '16px',
-                    boxShadow: formData.riskTolerance === option.value ? '0 8px 25px rgba(102, 126, 234, 0.2)' : '0 4px 12px rgba(0,0,0,0.05)',
-                    transition: 'all 0.3s ease',
+                    borderColor: formData.riskTolerance === option.value ? '#8B5CF6' : '#E5E7EB',
+                    borderRadius: '12px',
+                    boxShadow: formData.riskTolerance === option.value ? '0 4px 12px rgba(139, 92, 246, 0.1)' : 'none',
+                    transition: 'all 0.2s ease-in-out',
                     '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.2)'
+                      borderColor: '#8B5CF6',
+                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.05)'
                     }
                   }}
                 >
@@ -401,15 +430,15 @@ const Onboarding = () => {
                         onChange={(e) => handleInputChange(e)}
                         name="riskTolerance"
                         value={option.value}
-                        sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }}
+                        sx={{ color: '#8B5CF6', '&.Mui-checked': { color: '#8B5CF6' } }}
                       />
                     }
                     label={
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
                           {option.label}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: '#64748b' }}>
+                        <Typography variant="body2" sx={{ color: '#6B7280' }}>
                           {option.description}
                         </Typography>
                       </Box>
@@ -425,11 +454,8 @@ const Onboarding = () => {
       case 3:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-              How did you hear about FlowInvest?
-            </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
-              Help us understand how to reach more investors like you.
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
+              How did you hear about us?
             </Typography>
             <FormControl fullWidth sx={{ mb: 4 }}>
               <Select
@@ -439,17 +465,20 @@ const Onboarding = () => {
                 displayEmpty
                 sx={{
                   borderRadius: '12px',
-                  background: 'rgba(248, 250, 252, 0.8)',
-                  '&:hover fieldset': {
-                    borderColor: '#667eea'
+                  backgroundColor: '#ffffff',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#E5E7EB',
                   },
-                  '&.Mui-focused fieldset': {
-                    borderColor: '#667eea'
-                  }
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#D1D5DB',
+                  },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                    borderColor: '#8B5CF6',
+                  },
                 }}
               >
                 <MenuItem value="" disabled>
-                  <em>Select how you heard about us</em>
+                  <em>Select an option</em>
                 </MenuItem>
                 {referralOptions.map((option) => (
                   <MenuItem key={option.value} value={option.value}>
@@ -460,14 +489,38 @@ const Onboarding = () => {
               {formData.referralSource === 'other' && (
                 <TextField
                   fullWidth
-                  sx={{ mt: 2 }}
                   label="Please specify"
                   name="referralOther"
                   value={formData.referralOther}
                   onChange={handleInputChange}
+                  variant="outlined"
+                  sx={{
+                    mt: 2,
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: '#ffffff',
+                      '& fieldset': {
+                        borderColor: '#E5E7EB',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: '#D1D5DB',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#8B5CF6',
+                      },
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#6B7280',
+                    },
+                    '& .MuiInputBase-input': {
+                      color: '#1F2937',
+                    }
+                  }}
                 />
               )}
-              <FormHelperText>This helps us improve our marketing and reach more investors</FormHelperText>
+              <FormHelperText sx={{ color: '#6B7280', mt: 1 }}>
+                This helps us improve our marketing and reach more investors.
+              </FormHelperText>
             </FormControl>
           </Box>
         );
@@ -475,11 +528,11 @@ const Onboarding = () => {
       case 4:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
               Investment Interests
             </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
-              What interests you? (Select all that apply)
+            <Typography variant="body2" sx={{ color: '#6B7280', mb: 4 }}>
+              Select all that apply.
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 4 }}>
               {interestOptions.map((interest) => (
@@ -487,16 +540,15 @@ const Onboarding = () => {
                   key={interest}
                   sx={{
                     p: 2,
-                    background: formData.interests.includes(interest) ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' : 'rgba(255,255,255,0.8)',
-                    backdropFilter: 'blur(10px)',
+                    backgroundColor: formData.interests.includes(interest) ? '#F3EBFF' : '#ffffff',
                     border: '1px solid',
-                    borderColor: formData.interests.includes(interest) ? '#667eea' : 'rgba(255,255,255,0.3)',
-                    borderRadius: '16px',
-                    boxShadow: formData.interests.includes(interest) ? '0 8px 25px rgba(102, 126, 234, 0.2)' : '0 4px 12px rgba(0,0,0,0.05)',
-                    transition: 'all 0.3s ease',
+                    borderColor: formData.interests.includes(interest) ? '#8B5CF6' : '#E5E7EB',
+                    borderRadius: '12px',
+                    boxShadow: formData.interests.includes(interest) ? '0 4px 12px rgba(139, 92, 246, 0.1)' : 'none',
+                    transition: 'all 0.2s ease-in-out',
                     '&:hover': {
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 8px 25px rgba(102, 126, 234, 0.2)'
+                      borderColor: '#8B5CF6',
+                      boxShadow: '0 4px 12px rgba(139, 92, 246, 0.05)'
                     }
                   }}
                 >
@@ -504,28 +556,13 @@ const Onboarding = () => {
                     control={
                       <Checkbox
                         checked={formData.interests.includes(interest)}
-                        onChange={(e) => {
-                          setFormData(prevData => {
-                            const isChecked = e.target.checked;
-                            if (isChecked) {
-                              return {
-                                ...prevData,
-                                interests: [...prevData.interests, interest]
-                              };
-                            } else {
-                              return {
-                                ...prevData,
-                                interests: prevData.interests.filter(item => item !== interest)
-                              };
-                            }
-                          });
-                        }}
+                        onChange={() => handleInterestChange(interest)}
                         name={interest}
-                        sx={{ color: '#667eea', '&.Mui-checked': { color: '#667eea' } }}
+                        sx={{ color: '#8B5CF6', '&.Mui-checked': { color: '#8B5CF6' } }}
                       />
                     }
                     label={
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                      <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
                         {interest}
                       </Typography>
                     }
@@ -540,43 +577,39 @@ const Onboarding = () => {
       case 5:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 2, fontSize: { xs: '1.2rem', sm: '1.5rem' } }}>
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 2 }}>
               What you'll get with FlowInvest
             </Typography>
             <Box
               sx={{
-                display: 'flex',
-                flexDirection: { xs: 'row', sm: 'row' },
-                flexWrap: 'wrap',
-                gap: 1,
-                mb: 2,
-                justifyContent: 'center',
-                alignItems: 'stretch',
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+                gap: 1.5,
+                mb: 1,
               }}
             >
               {benefits.map((benefit, index) => (
                 <Paper
                   key={index}
                   sx={{
-                    p: 1.2,
-                    minWidth: 0,
-                    flex: '1 1 100px',
-                    maxWidth: 120,
-                    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
-                    border: '1px solid rgba(102, 126, 234, 0.15)',
-                    borderRadius: '12px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+                    p: 1.5,
+                    backgroundColor: '#F9FAFB',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    textAlign: 'center'
                   }}
                 >
-                  <Typography variant="h3" sx={{ fontSize: '2rem', mb: 0.5 }}>
-                    {benefit.icon}
-                  </Typography>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.95rem', textAlign: 'center', mb: 0.5 }}>
+                  {benefit.icon}
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937', mt: 0.5, mb: 0.25 }}>
                     {benefit.title}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#6B7280', lineHeight: 1.3 }}>
+                    {benefit.description}
                   </Typography>
                 </Paper>
               ))}
@@ -587,32 +620,41 @@ const Onboarding = () => {
       case 6:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-              Investment Goals
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
+              Your Investment Goals
             </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
-              Tell us about your investment goals and what you hope to achieve.
+            <Typography variant="body2" sx={{ color: '#6B7280', mb: 4 }}>
+              Tell us what you hope to achieve with your investments.
             </Typography>
             <TextField
               fullWidth
-              label="Your investing goals"
+              label="e.g., Save for retirement, build passive income..."
               name="primaryGoal"
               value={formData.primaryGoal}
               onChange={handleInputChange}
               multiline
               rows={4}
-              placeholder="e.g., Save for retirement, build passive income, grow wealth for children's education..."
+              variant="outlined"
               sx={{
                 mb: 4,
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '12px',
-                  background: 'rgba(248, 250, 252, 0.8)',
+                  backgroundColor: '#ffffff',
+                  '& fieldset': {
+                    borderColor: '#E5E7EB',
+                  },
                   '&:hover fieldset': {
-                    borderColor: '#667eea'
+                    borderColor: '#D1D5DB',
                   },
                   '&.Mui-focused fieldset': {
-                    borderColor: '#667eea'
-                  }
+                    borderColor: '#8B5CF6',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#6B7280',
+                },
+                '& .MuiInputBase-input': {
+                  color: '#1F2937',
                 }
               }}
               required
@@ -623,37 +665,37 @@ const Onboarding = () => {
       case 7:
         return (
           <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" sx={{ fontWeight: 600, color: '#1e293b', mb: 3 }}>
-              Let's analyze your portfolio
+            <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
+              Analyze Your Portfolio
             </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b', mb: 4 }}>
-              Upload a screenshot of your current investment portfolio to get a quick analysis.
+            <Typography variant="body2" sx={{ color: '#6B7280', mb: 4 }}>
+              Upload a screenshot of your current investment portfolio for a quick analysis.
             </Typography>
             
             {!formData.screenshotFile ? (
               <Box
                 sx={{
-                  border: '2px dashed #667eea',
-                  borderRadius: '16px',
+                  border: '2px dashed #D1D5DB',
+                  borderRadius: '12px',
                   p: 4,
                   textAlign: 'center',
                   mb: 4,
-                  background: 'rgba(102, 126, 234, 0.05)',
+                  backgroundColor: '#F9FAFB',
                   cursor: 'pointer',
-                  transition: 'all 0.3s ease',
+                  transition: 'all 0.2s ease-in-out',
                   '&:hover': {
-                    background: 'rgba(102, 126, 234, 0.1)',
-                    borderColor: '#5a67d8'
+                    borderColor: '#8B5CF6',
+                    backgroundColor: '#F3EBFF'
                   }
                 }}
                 onClick={() => document.getElementById('screenshot-upload').click()}
               >
-                <CloudUploadIcon sx={{ fontSize: 48, color: '#667eea', mb: 2 }} />
-                <Typography variant="h6" sx={{ color: '#1e293b', mb: 1 }}>
+                <CloudUploadIcon sx={{ fontSize: 48, color: '#8B5CF6', mb: 2 }} />
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937', mb: 1 }}>
                   Upload Portfolio Screenshot
                 </Typography>
-                <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Click to select a screenshot from your investment app or broker
+                <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                  Click to select an image from your device.
                 </Typography>
                 <input
                   id="screenshot-upload"
@@ -671,14 +713,14 @@ const Onboarding = () => {
                     alt="Portfolio Screenshot"
                     style={{
                       width: '100%',
-                      maxHeight: '300px',
+                      maxHeight: '200px',
                       objectFit: 'contain',
                       borderRadius: '12px',
-                      border: '1px solid #e2e8f0'
+                      border: '1px solid #E5E7EB'
                     }}
                   />
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     size="small"
                     onClick={() => {
                       setFormData(prev => ({
@@ -693,72 +735,112 @@ const Onboarding = () => {
                       top: 8,
                       right: 8,
                       minWidth: 'auto',
-                      p: 1,
-                      background: 'rgba(255,255,255,0.9)',
+                      p: '4px 8px',
+                      backgroundColor: '#6B7280',
+                      color: '#ffffff',
+                      borderRadius: '8px',
                       '&:hover': {
-                        background: 'rgba(255,255,255,1)'
+                        backgroundColor: '#4B5563'
                       }
                     }}
                   >
-                    ✕
+                    Remove
                   </Button>
                 </Box>
               </Box>
             ) : null}
 
             {formData.portfolioAnalysis && (
-              <Paper sx={{ p: 3, background: 'rgba(102, 126, 234, 0.05)', borderRadius: '16px', mb: 4 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
-                  Portfolio Analysis Preview
+              <Paper sx={{ p: 3, backgroundColor: '#F9FAFB', borderRadius: '12px', mb: 4, border: '1px solid #E5E7EB' }}>
+                <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937', mb: 2 }}>
+                  Analysis Preview
                 </Typography>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Box
                     sx={{
-                      width: 60,
-                      height: 60,
+                      width: 56,
+                      height: 56,
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      background: getGradeGradient(formData.portfolioAnalysis.grade),
+                      backgroundColor: getGradeColor(formData.portfolioAnalysis.grade),
                       color: 'white',
                       fontWeight: 700,
-                      fontSize: '24px'
+                      fontSize: '20px'
                     }}
                   >
                     {formData.portfolioAnalysis.grade}
                   </Box>
-                  <Box sx={{ ml: 2 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  <Box sx={{ ml: 2, flex: 1 }}>
+                    <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
                       Grade: {formData.portfolioAnalysis.grade}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b' }}>
-                      Risk Score: {formData.portfolioAnalysis.riskScore !== undefined && formData.portfolioAnalysis.riskScore !== null ? `${formData.portfolioAnalysis.riskScore}/10` : 'N/A'}
+                  </Box>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: '8px',
+                    p: 1,
+                    minWidth: 60
+                  }}>
+                    <Typography variant="caption" sx={{ color: '#6B7280', fontWeight: 500 }}>
+                      Risk
+                    </Typography>
+                    <Typography variant="h6" sx={{ 
+                      color: formData.portfolioAnalysis.riskScore >= 7 ? '#DC2626' : 
+                             formData.portfolioAnalysis.riskScore >= 5 ? '#F59E0B' : '#10B981',
+                      fontWeight: 700 
+                    }}>
+                      {(() => {
+                        const score = Number(formData.portfolioAnalysis.riskScore);
+                        return !isNaN(score) && score > 0 ? `${score}/10` : 'N/A';
+                      })()}
                     </Typography>
                   </Box>
                 </Box>
                 
-                <Typography variant="body1" sx={{ color: '#64748b', mb: 3 }}>
-                  {formData.portfolioAnalysis.analysis}
+                <Typography variant="body2" sx={{ color: '#374151', mb: 2 }}>
+                  {(() => {
+                    const text = formData.portfolioAnalysis.analysis;
+                    // Remove bullet points, dashes, and other list markers
+                    const cleanText = text.replace(/^[\s•\-*]+/, '').replace(/\n[\s•\-*]+/g, '\n');
+                    // Split into sentences and take first 3
+                    const sentences = cleanText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+                    const firstThreeSentences = sentences.slice(0, 3);
+                    const preview = firstThreeSentences.join('. ') + (sentences.length > 3 ? '...' : '');
+                    return preview;
+                  })()}
+                </Typography>
+                
+                <Typography variant="body2" sx={{ color: '#6B7280', fontStyle: 'italic', mb: 2 }}>
+                  Risk Level: {formData.portfolioAnalysis.riskScore >= 7 ? 'High' : 
+                              formData.portfolioAnalysis.riskScore >= 5 ? 'Moderate' : 'Low'} 
+                  ({formData.portfolioAnalysis.riskScore}/10)
                 </Typography>
                 
                 <Box sx={{ 
                   p: 2, 
-                  background: 'rgba(255,255,255,0.8)', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(102, 126, 234, 0.2)'
+                  backgroundColor: '#E0E7FF', 
+                  borderRadius: '8px',
+                  border: '1px solid #C7D2FE'
                 }}>
-                  <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
-                    💡 This is just a preview. Sign up to see the complete analysis.
+                  <Typography variant="body2" sx={{ color: '#4338CA', fontStyle: 'italic' }}>
+                    💡 This is a preview. Sign up to see the complete analysis.
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#4338CA', fontStyle: 'italic', mt: 1, fontSize: '0.875rem' }}>
+                    Note: The full analysis may differ from this preview as it will be based on your complete profile and saved investments.
                   </Typography>
                 </Box>
               </Paper>
             )}
             {formData.analysisLoading && (
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', my: 4 }}>
-                <CircularProgress size={48} sx={{ color: '#667eea', mb: 2 }} />
-                <Typography variant="body1" sx={{ color: '#667eea', fontWeight: 600 }}>
+                <CircularProgress size={40} sx={{ color: '#8B5CF6', mb: 2 }} />
+                <Typography variant="body1" sx={{ color: '#8B5CF6', fontWeight: 600 }}>
                   Analyzing your screenshot...
                 </Typography>
               </Box>
@@ -774,37 +856,35 @@ const Onboarding = () => {
   return (
     <Box sx={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      backgroundColor: '#ffffff',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       py: 4
     }}>
-      <Container maxWidth="md">
+      <Container maxWidth="sm">
         <Paper sx={{
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          borderRadius: '24px',
-          p: { xs: 3, md: 5 },
-          boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+          p: { xs: 3, md: 4 },
+          backgroundColor: '#F9FAFB',
+          borderRadius: '16px',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+          border: '1px solid #E5E7EB',
           overflow: 'hidden'
         }}>
           <Box sx={{ textAlign: 'center', mb: 4 }}>
             <Typography
-              variant="h3"
+              variant="h4"
               component="h1"
               sx={{
-                background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
                 fontWeight: 700,
+                color: '#1F2937',
                 mb: 1,
+                fontSize: { xs: '1.5rem', sm: '2rem' }
               }}
             >
-              FlowInvest
+              Welcome to FlowInvest
             </Typography>
-            <Typography variant="body1" sx={{ color: '#64748b' }}>
+            <Typography variant="body1" sx={{ color: '#6B7280' }}>
               Let's get to know you better to tailor your investment experience.
             </Typography>
           </Box>
@@ -814,11 +894,11 @@ const Onboarding = () => {
               <Box
                 key={index}
                 sx={{
-                  width: 12,
-                  height: 12,
+                  width: 10,
+                  height: 10,
                   borderRadius: '50%',
-                  bgcolor: currentStep >= index ? '#667eea' : '#cbd5e1',
-                  mx: 1,
+                  bgcolor: currentStep >= index ? '#8B5CF6' : '#E5E7EB',
+                  mx: '4px',
                   transition: 'background-color 0.3s ease'
                 }}
               />
@@ -835,16 +915,15 @@ const Onboarding = () => {
                 sx={{
                   textTransform: 'none',
                   borderRadius: '12px',
-                  px: 3,
-                  py: 1.5,
+                  px: 2,
+                  py: 1,
                   fontWeight: 600,
-                  color: '#667eea',
-                  borderColor: '#667eea',
+                  color: '#6B7280',
+                  borderColor: '#D1D5DB',
                   '&:hover': {
-                    background: 'rgba(102, 126, 234, 0.1)',
-                    borderColor: '#5a67d8'
+                    backgroundColor: '#F3F4F6',
+                    borderColor: '#9CA3AF'
                   },
-                  transition: 'all 0.3s ease'
                 }}
               >
                 Back
@@ -860,23 +939,24 @@ const Onboarding = () => {
                 sx={{
                   textTransform: 'none',
                   borderRadius: '12px',
-                  px: 3,
-                  py: 1.5,
+                  px: 2,
+                  py: 1,
                   fontWeight: 600,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
+                  boxShadow: 'none',
                   '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                    backgroundColor: '#7C3AED',
+                    boxShadow: 'none'
                   },
                   '&:disabled': {
-                    background: 'rgba(100, 116, 139, 0.3)',
-                    color: 'rgba(255,255,255,0.7)'
+                    backgroundColor: '#E5E7EB',
+                    color: '#9CA3AF'
                   },
-                  transition: 'all 0.3s ease',
                   ml: currentStep > 0 ? 'auto' : 0
                 }}
               >
-                {formData.analysisLoading ? 'Analyzing...' : 'Analyze Portfolio'}
+                {formData.analysisLoading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Analyze Portfolio'}
               </Button>
             ) : currentStep === 7 && formData.portfolioAnalysis ? (
               <Button
@@ -895,23 +975,24 @@ const Onboarding = () => {
                 sx={{
                   textTransform: 'none',
                   borderRadius: '12px',
-                  px: 2.5,
-                  py: 1.5,
+                  px: 2,
+                  py: 1,
                   fontWeight: 600,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
+                  boxShadow: 'none',
                   '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                    backgroundColor: '#7C3AED',
+                    boxShadow: 'none'
                   },
                   '&:disabled': {
-                    background: 'rgba(100, 116, 139, 0.3)',
-                    color: 'rgba(255,255,255,0.7)'
+                    backgroundColor: '#E5E7EB',
+                    color: '#9CA3AF'
                   },
-                  transition: 'all 0.3s ease',
                   ml: currentStep > 0 ? 'auto' : 0
                 }}
               >
-                {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Sign up to see analysis'}
+                {loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Sign up to see analysis'}
               </Button>
             ) : (
               <Button
@@ -921,23 +1002,24 @@ const Onboarding = () => {
                 sx={{
                   textTransform: 'none',
                   borderRadius: '12px',
-                  px: 3,
-                  py: 1.5,
+                  px: 2,
+                  py: 1,
                   fontWeight: 600,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  backgroundColor: '#8B5CF6',
+                  color: '#ffffff',
+                  boxShadow: 'none',
                   '&:hover': {
-                    transform: 'translateY(-2px)',
-                    boxShadow: '0 8px 25px rgba(102, 126, 234, 0.3)'
+                    backgroundColor: '#7C3AED',
+                    boxShadow: 'none'
                   },
                   '&:disabled': {
-                    background: 'rgba(100, 116, 139, 0.3)',
-                    color: 'rgba(255,255,255,0.7)'
+                    backgroundColor: '#E5E7EB',
+                    color: '#9CA3AF'
                   },
-                  transition: 'all 0.3s ease',
                   ml: currentStep > 0 ? 'auto' : 0
                 }}
               >
-                {loading ? <CircularProgress size={24} sx={{ color: 'white' }} /> : 'Next'}
+                {loading ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Next'}
               </Button>
             )}
           </Box>
@@ -948,3 +1030,4 @@ const Onboarding = () => {
 };
 
 export default Onboarding;
+
