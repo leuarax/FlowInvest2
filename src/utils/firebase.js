@@ -120,14 +120,28 @@ export const sendPasswordResetEmailHandler = async (email) => {
 export const createUserProfile = async (userId, profileData) => {
   try {
     console.log('Creating user profile for:', userId, 'with data:', profileData);
+    console.log('Profile data details:', {
+      displayName: profileData.displayName,
+      email: profileData.email,
+      experience: profileData.experience,
+      riskTolerance: profileData.riskTolerance,
+      interests: profileData.interests,
+      primaryGoal: profileData.primaryGoal,
+      name: profileData.name,
+      referralSource: profileData.referralSource
+    });
     
-    await setDoc(doc(db, 'user_profiles', userId), {
+    const dataToSave = {
       ...profileData,
       createdAt: new Date(),
       updatedAt: new Date()
-    });
+    };
     
-    console.log('User profile created successfully');
+    console.log('Final data to save to Firestore:', dataToSave);
+    
+    await setDoc(doc(db, 'user_profiles', userId), dataToSave);
+    
+    console.log('User profile created successfully in Firestore');
     return { error: null };
   } catch (error) {
     console.error('Error creating user profile:', error);

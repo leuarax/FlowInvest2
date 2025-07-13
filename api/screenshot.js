@@ -31,9 +31,39 @@ async function analyzeScreenshot(req, res) {
     const imageBuffer = req.file.buffer;
     const base64Image = imageBuffer.toString('base64');
 
-    // Prepare the prompt
+    // Prepare the prompt with user profile context
+    let userContext = '';
+    if (userProfile) {
+      userContext = `
+User Profile Information:
+- Experience Level: ${userProfile.experience || 'Not specified'}
+- Risk Tolerance: ${userProfile.riskTolerance || 'Not specified'}
+- Investment Interests: ${userProfile.interests ? userProfile.interests.join(', ') : 'Not specified'}
+- Primary Goal: ${userProfile.primaryGoal || 'Not specified'}
+- Investment Timeline: ${userProfile.timeline || 'Not specified'}
+
+Please consider the user's profile when analyzing this investment. Adjust your recommendations based on their experience level, risk tolerance, and investment goals.`;
+    }
+
     const prompt = `You are a senior financial analyst. Analyze the investment screenshot and the user's notes to identify ALL individual investments shown. 
-Return a single, valid JSON array. Each element in the array MUST be a JSON object with these exact fields and data types: "name" (string), "type" (string), "amount" (number, e.g., 126.50), "duration" (string, one of: "Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"), "grade" (string, one of: "A", "B", "C", "D", "F"), "riskScore" (number, an integer from 1 to 10), "roiEstimate" (number, e.g., 15.5), and "explanation" (string).\n\nIf there are multiple investments, each must be a separate object in the array. If there is only one, return an array with one object. Do not summarize or merge investments. Do NOT wrap it in markdown.\n\nThe user's notes are: "${additionalNotes}".`;
+
+Return a single, valid JSON array. Each element in the array MUST be a JSON object with these exact fields and data types:
+- "name" (string): The name of the investment
+- "type" (string): The type of investment (e.g., Stock, ETF, Bond, etc.)
+- "amount" (number): The investment amount (e.g., 126.50)
+- "duration" (string): One of "Short-term (0-1 year)", "Mid-term (1-5 years)", "Long-term (5+ years)"
+- "grade" (string): One of "A", "B", "C", "D", "F" - based on the investment's quality and potential
+- "riskScore" (number): An integer from 1 to 10 (1 = very low risk, 10 = very high risk)
+- "roiEstimate" (number): Expected yearly return percentage (e.g., 15.5)
+- "roiScenarios" (object): A JSON object with three fields for YEARLY returns:
+  - "pessimistic" (number): Worst-case scenario yearly ROI
+  - "realistic" (number): Most likely scenario yearly ROI  
+  - "optimistic" (number): Best-case scenario yearly ROI
+- "explanation" (string): A detailed, multi-sentence explanation of your analysis. Address the user directly and explain your reasoning for the grade, risk score, and ROI estimates. Consider their experience level, risk tolerance, and investment goals. Keep it concise but informative.
+
+If there are multiple investments, each must be a separate object in the array. If there is only one, return an array with one object. Do not summarize or merge investments. Do NOT wrap it in markdown.
+
+The user's notes are: "${additionalNotes}".${userContext}`;
 
     console.log('Calling OpenAI API with image...');
     
@@ -140,6 +170,23 @@ Return a single, valid JSON array. Each element in the array MUST be a JSON obje
             roiEstimate = rawAnalysis.roiEstimate;
           }
           sanitizedAnalysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
+          
+          // ROI Scenarios
+          if (rawAnalysis.roiScenarios && typeof rawAnalysis.roiScenarios === 'object') {
+            sanitizedAnalysis.roiScenarios = {
+              pessimistic: typeof rawAnalysis.roiScenarios.pessimistic === 'number' ? rawAnalysis.roiScenarios.pessimistic : roiEstimate * 0.8,
+              realistic: typeof rawAnalysis.roiScenarios.realistic === 'number' ? rawAnalysis.roiScenarios.realistic : roiEstimate,
+              optimistic: typeof rawAnalysis.roiScenarios.optimistic === 'number' ? rawAnalysis.roiScenarios.optimistic : roiEstimate * 1.2
+            };
+          } else {
+            // Default ROI scenarios if not provided
+            sanitizedAnalysis.roiScenarios = {
+              pessimistic: roiEstimate * 0.8,
+              realistic: roiEstimate,
+              optimistic: roiEstimate * 1.2
+            };
+          }
+          
           sanitizedAnalysis.explanation = rawAnalysis.explanation || 'No explanation provided.';
           return sanitizedAnalysis;
         });
@@ -183,6 +230,23 @@ Return a single, valid JSON array. Each element in the array MUST be a JSON obje
           roiEstimate = rawAnalysis.roiEstimate;
         }
         sanitizedAnalysis.roiEstimate = isNaN(roiEstimate) ? 0 : roiEstimate;
+        
+        // ROI Scenarios
+        if (rawAnalysis.roiScenarios && typeof rawAnalysis.roiScenarios === 'object') {
+          sanitizedAnalysis.roiScenarios = {
+            pessimistic: typeof rawAnalysis.roiScenarios.pessimistic === 'number' ? rawAnalysis.roiScenarios.pessimistic : roiEstimate * 0.8,
+            realistic: typeof rawAnalysis.roiScenarios.realistic === 'number' ? rawAnalysis.roiScenarios.realistic : roiEstimate,
+            optimistic: typeof rawAnalysis.roiScenarios.optimistic === 'number' ? rawAnalysis.roiScenarios.optimistic : roiEstimate * 1.2
+          };
+        } else {
+          // Default ROI scenarios if not provided
+          sanitizedAnalysis.roiScenarios = {
+            pessimistic: roiEstimate * 0.8,
+            realistic: roiEstimate,
+            optimistic: roiEstimate * 1.2
+          };
+        }
+        
         sanitizedAnalysis.explanation = rawAnalysis.explanation || 'No explanation provided.';
         analysis = [sanitizedAnalysis];
       }
@@ -190,26 +254,27 @@ Return a single, valid JSON array. Each element in the array MUST be a JSON obje
       console.error('Error parsing analysis response:', e);
       console.error('Raw response content:', response.choices[0].message.content);
       
-      // Try to extract any useful information from the response
-      let explanation = 'Analysis completed but could not parse the response.';
       const content = response.choices[0].message.content;
       
-      // If the response is in markdown, use it as is
-      if (content.includes('```')) {
-        explanation = content;
+      // Check if the AI is saying it can't process the image
+      if (content.toLowerCase().includes('unable to process') || 
+          content.toLowerCase().includes('unable to extract') || 
+          content.toLowerCase().includes('cannot see') ||
+          content.toLowerCase().includes('cannot identify')) {
+        
+        return res.status(400).json({
+          error: 'Screenshot Analysis Failed',
+          message: 'The image does not contain clear investment information. Please upload a screenshot that shows: stock names, investment amounts, portfolio values, or other financial data.',
+          details: 'Try uploading a screenshot from your broker that clearly displays investment holdings, stock symbols, or portfolio information.'
+        });
       }
       
-      // Create a basic analysis object with the best available data
-      analysis = {
-        name: 'Investment from Screenshot',
-        type: 'Unknown',
-        amount: 0,
-        duration: 'Unknown',
-        grade: 'N/A',
-        riskScore: 5,
-        roiEstimate: 0,
-        explanation: explanation
-      };
+      // For other parsing errors, return a generic error
+      return res.status(500).json({
+        error: 'Analysis Error',
+        message: 'Failed to analyze the screenshot. Please try again with a different image.',
+        details: 'The analysis could not be completed. Please ensure the image is clear and contains investment-related information.'
+      });
     }
     
     // Add additional metadata to each investment

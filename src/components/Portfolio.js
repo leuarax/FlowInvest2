@@ -496,7 +496,7 @@ const Portfolio = () => {
                       <TableCell sx={{ color: '#1F2937', fontSize: '0.875rem', borderBottom: '1px solid #E5E7EB' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Typography variant="body2" sx={{ color: '#1F2937', minWidth: '30px' }}>
-                            {investment.riskScore}/10
+                            {Math.round(investment.riskScore)}/10
                           </Typography>
                           <Box sx={{ flex: 1, maxWidth: 60 }}>
                             <LinearProgress

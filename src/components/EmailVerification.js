@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -10,16 +10,37 @@ import {
 } from '@mui/material';
 import EmailIcon from '@mui/icons-material/Email';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const EmailVerification = () => {
-  const { user, verificationLoading, checkEmailVerificationStatus, resendVerificationEmailHandler } = useAuth();
+  const { user, emailVerified, verificationLoading, checkEmailVerificationStatus, resendVerificationEmailHandler } = useAuth();
+  const navigate = useNavigate();
   const [resendSuccess, setResendSuccess] = useState(false);
   const [resendError, setResendError] = useState('');
+  const [checkError, setCheckError] = useState('');
+
+  // Redirect to dashboard if email is already verified
+  useEffect(() => {
+    if (emailVerified) {
+      console.log('Email verified, redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [emailVerified, navigate]);
 
   const handleCheckVerification = async () => {
-    const { error } = await checkEmailVerificationStatus();
+    setCheckError('');
+    console.log('Checking email verification status...');
+    
+    const { isVerified, error } = await checkEmailVerificationStatus();
+    
     if (error) {
       console.error('Error checking verification status:', error);
+      setCheckError('Failed to check verification status. Please try again.');
+    } else if (isVerified) {
+      console.log('Email verification successful, redirecting...');
+      navigate('/dashboard');
+    } else {
+      setCheckError('Email not verified yet. Please check your inbox and click the verification link.');
     }
   };
 
@@ -104,6 +125,12 @@ const EmailVerification = () => {
             {resendError && (
               <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', backgroundColor: '#FEF2F2', color: '#DC2626' }}>
                 {resendError}
+              </Alert>
+            )}
+
+            {checkError && (
+              <Alert severity="error" sx={{ mb: 3, borderRadius: '8px', backgroundColor: '#FEF2F2', color: '#DC2626' }}>
+                {checkError}
               </Alert>
             )}
 

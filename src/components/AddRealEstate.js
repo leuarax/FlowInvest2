@@ -297,7 +297,7 @@ const AddRealEstate = () => {
                       }}>
                         <CardContent sx={{ pb: 0 }}>
                           <Typography variant="h4" sx={{ fontWeight: 700, color: '#1F2937', mb: 1 }}>
-                            {analysis.riskScore || 'N/A'}/10
+                            {Math.round(analysis.riskScore) || 'N/A'}/10
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#6B7280', fontWeight: 500, fontSize: '0.875rem' }}>
                             Risk Score

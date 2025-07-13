@@ -27,9 +27,14 @@ const LandingPage = () => {
 
   // Clear onboarding localStorage when landing page loads
   useEffect(() => {
-    localStorage.removeItem('onboardingStep');
-    localStorage.removeItem('onboardingData');
-    localStorage.removeItem('randomizedReferralOptions');
+    // Only clear onboarding data if user is not coming from onboarding flow
+    const onboardingData = localStorage.getItem('onboardingData');
+    if (!onboardingData) {
+      // User is starting fresh, clear any leftover data
+      localStorage.removeItem('onboardingStep');
+      localStorage.removeItem('randomizedReferralOptions');
+    }
+    // Don't clear onboardingData if it exists - user might be coming from onboarding
   }, []);
 
   const handleGetStarted = () => {

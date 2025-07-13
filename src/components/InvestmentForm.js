@@ -47,13 +47,13 @@ const InvestmentForm = () => {
   const simulateProgress = () => {
     let progress = 0;
     const interval = setInterval(() => {
-      progress += Math.random() * 5;
-      if (progress >= 100) {
-        progress = 100;
+      progress += 2; // Fixed increment instead of random
+      if (progress >= 90) { // Stop at 90% to let the actual response complete it
+        progress = 90;
         clearInterval(interval);
       }
       setAnalysisProgress(progress);
-    }, 500);
+    }, 200);
   };
 
   const handleAnalyze = async () => {
@@ -78,20 +78,20 @@ const InvestmentForm = () => {
     try {
       let res;
       try {
-        res = await fetch('http://localhost:3001/api/analyze-screenshot', {
+        res = await fetch('http://localhost:3001/api/screenshot', {
           method: 'POST',
           body: apiFormData,
         });
       } catch (err) {
         console.log('Local server failed, trying production URL...', err);
         try {
-          res = await fetch('/api/analyze-screenshot', {
+          res = await fetch('/api/screenshot', {
             method: 'POST',
             body: apiFormData,
           });
         } catch (prodErr) {
           console.log('Production URL failed, trying Vercel fallback...', prodErr);
-          res = await fetch('https://flow-invest2-hpr3.vercel.app/api/analyze-screenshot', {
+          res = await fetch('https://flow-invest2-hpr3.vercel.app/api/screenshot', {
             method: 'POST',
             body: apiFormData,
           });
@@ -100,14 +100,35 @@ const InvestmentForm = () => {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: 'Server error' }));
-        throw new Error(errData.error || `HTTP error! status: ${res.status}`);
+        throw new Error(errData.message || errData.error || `HTTP error! status: ${res.status}`);
       }
 
       const result = await res.json();
-      setAnalysis(result);
+      console.log('Analysis result:', result);
+      
+      // Handle both single object and array responses
+      if (Array.isArray(result) && result.length > 0) {
+        // If it's an array, take the first investment
+        setAnalysis(result[0]);
+      } else if (typeof result === 'object' && result !== null) {
+        // If it's a single object
+        setAnalysis(result);
+      } else {
+        throw new Error('Invalid analysis result received from server');
+      }
     } catch (err) {
       console.error('Analysis failed:', err);
-      setError(err.message || 'An unknown error occurred during analysis.');
+      setAnalysisProgress(100); // Complete the progress bar
+      
+      // Check if it's a screenshot analysis error
+      if (err.message && (err.message.includes('Screenshot Analysis Failed') || 
+                          err.message.includes('unable to process') ||
+                          err.message.includes('unable to extract') ||
+                          err.message.includes('does not contain clear investment information'))) {
+        setError('AI couldn\'t analyse your image. Choose a screenshot similar to the sample with only one investment visible.');
+      } else {
+        setError(err.message || 'An unknown error occurred during analysis.');
+      }
     } finally {
       setLoading(false);
     }
@@ -174,16 +195,17 @@ const InvestmentForm = () => {
 
         {/* Main Content */}
         <Grid container spacing={4} sx={{ flex: 1, minHeight: 0 }}>
-          {/* Left Side: Input Form */}
-          <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column' }}>
-            <Paper sx={{ 
-              backgroundColor: '#F9FAFB',
-              border: '1px solid #E5E7EB',
-              borderRadius: '16px',
-              p: 3,
-              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-              flex: 1
-            }}>
+          {/* Left Side: Input Form - Only show when no analysis */}
+          {!analysis && (
+            <Grid item xs={12} md={5} sx={{ display: 'flex', flexDirection: 'column' }}>
+              <Paper sx={{ 
+                backgroundColor: '#F9FAFB',
+                border: '1px solid #E5E7EB',
+                borderRadius: '16px',
+                p: 3,
+                boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                flex: 1
+              }}>
               {/* New Heading and Subtext */}
               <Box sx={{ mb: 3 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
@@ -408,9 +430,10 @@ const InvestmentForm = () => {
               </Grid>
             </Paper>
           </Grid>
+          )}
 
           {/* Right Side: Analysis Results */}
-          <Grid item xs={12} md={7} sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Grid item xs={12} md={analysis ? 12 : 7} sx={{ display: 'flex', flexDirection: 'column' }}>
             <Paper sx={{ 
               backgroundColor: '#F9FAFB',
               border: '1px solid #E5E7EB',
@@ -516,7 +539,7 @@ const InvestmentForm = () => {
                             </Typography>
                           </Box>
                           <Typography variant="h5" sx={{ fontWeight: 700, color: '#1F2937', mb: 1 }}>
-                            {analysis.riskScore || 'N/A'}/10
+                            {Math.round(analysis.riskScore) || 'N/A'}/10
                           </Typography>
                           <LinearProgress 
                             variant="determinate" 
@@ -555,7 +578,7 @@ const InvestmentForm = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                             <TrendingUpIcon sx={{ fontSize: 24, color: '#1F2937', mr: 1 }} />
                             <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
-                              ROI Scenarios
+                              Yearly ROI Scenarios
                             </Typography>
                           </Box>
                           {analysis.roiScenarios ? (
@@ -566,7 +589,7 @@ const InvestmentForm = () => {
                                     {analysis.roiScenarios.pessimistic}%
                                   </Typography>
                                   <Chip 
-                                    label="Pessimistic" 
+                                    label="Pessimistic (Yearly)" 
                                     size="small"
                                     sx={{ 
                                       backgroundColor: '#FEF2F2',
@@ -582,7 +605,7 @@ const InvestmentForm = () => {
                                     {analysis.roiScenarios.realistic}%
                                   </Typography>
                                   <Chip 
-                                    label="Realistic" 
+                                    label="Realistic (Yearly)" 
                                     size="small"
                                     sx={{ 
                                       backgroundColor: '#F3E8FF',
@@ -598,7 +621,7 @@ const InvestmentForm = () => {
                                     {analysis.roiScenarios.optimistic}%
                                   </Typography>
                                   <Chip 
-                                    label="Optimistic" 
+                                    label="Optimistic (Yearly)" 
                                     size="small"
                                     sx={{ 
                                       backgroundColor: '#ECFDF5',
@@ -650,6 +673,37 @@ const InvestmentForm = () => {
                         <Typography sx={{ color: '#6B7280' }}>Not available.</Typography>
                       )}
                     </Paper>
+
+                    {/* New Analysis Button */}
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                      <Button
+                        onClick={() => {
+                          setAnalysis(null);
+                          setError(null);
+                          setFile(null);
+                          setFilePreview('');
+                          setAdditionalNotes('');
+                        }}
+                        variant="outlined"
+                        startIcon={<AnalyticsIcon />}
+                        sx={{
+                          borderColor: '#8B5CF6',
+                          color: '#8B5CF6',
+                          borderRadius: '12px',
+                          px: 4,
+                          py: 1.5,
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          fontSize: '1rem',
+                          '&:hover': {
+                            borderColor: '#7C3AED',
+                            backgroundColor: 'rgba(139, 92, 246, 0.04)'
+                          }
+                        }}
+                      >
+                        Analyze Another Investment
+                      </Button>
+                    </Box>
                   </Box>
                 </Fade>
               ) : (

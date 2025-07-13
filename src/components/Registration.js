@@ -42,6 +42,29 @@ const Registration = () => {
     if (savedProfile) {
       // setOnboardingData(JSON.parse(savedProfile));
     }
+    
+    // Debug: Check what's in localStorage
+    console.log('Registration useEffect - localStorage contents:', {
+      onboardingData: localStorage.getItem('onboardingData'),
+      onboardingInvestments: localStorage.getItem('onboardingInvestments'),
+      userProfile: localStorage.getItem('userProfile'),
+      onboardingStep: localStorage.getItem('onboardingStep')
+    });
+    
+    // Monitor localStorage changes
+    const checkLocalStorage = () => {
+      const onboardingData = localStorage.getItem('onboardingData');
+      if (!onboardingData) {
+        console.log('WARNING: onboardingData was cleared from localStorage!');
+        console.trace('Stack trace for when onboardingData was cleared');
+      }
+    };
+    
+    // Check every 100ms for the first 5 seconds
+    const interval = setInterval(checkLocalStorage, 100);
+    setTimeout(() => clearInterval(interval), 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleInputChange = (e) => {
@@ -99,10 +122,56 @@ const Registration = () => {
     setError('');
 
     try {
-      const onboardingData = localStorage.getItem('onboardingData');
-      const parsedOnboardingData = onboardingData ? JSON.parse(onboardingData) : null;
+      // Get onboarding data from localStorage at the time of submission
+      const onboardingDataRaw = localStorage.getItem('onboardingData');
+      console.log('Raw onboarding data from localStorage at submission:', onboardingDataRaw);
+      
+      let parsedOnboardingData = null;
+      if (onboardingDataRaw) {
+        try {
+          parsedOnboardingData = JSON.parse(onboardingDataRaw);
+          console.log('Successfully parsed onboarding data at submission:', parsedOnboardingData);
+          console.log('Parsed data details:', {
+            name: parsedOnboardingData.name,
+            experience: parsedOnboardingData.experience,
+            riskTolerance: parsedOnboardingData.riskTolerance,
+            interests: parsedOnboardingData.interests,
+            primaryGoal: parsedOnboardingData.primaryGoal,
+            displayName: parsedOnboardingData.displayName
+          });
+        } catch (parseError) {
+          console.error('Error parsing onboarding data at submission:', parseError);
+        }
+      } else {
+        console.log('No onboarding data found in localStorage at submission time');
+        // Check if there are any other localStorage keys that might contain the data
+        console.log('All localStorage keys:', Object.keys(localStorage));
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          console.log(`localStorage[${key}]:`, localStorage.getItem(key));
+        }
+      }
+      
+      console.log('Registration - onboarding data from localStorage:', {
+        rawOnboardingData: onboardingDataRaw,
+        parsedOnboardingData,
+        hasExperience: !!parsedOnboardingData?.experience,
+        hasRiskTolerance: !!parsedOnboardingData?.riskTolerance,
+        hasInterests: !!parsedOnboardingData?.interests,
+        hasPrimaryGoal: !!parsedOnboardingData?.primaryGoal,
+        experience: parsedOnboardingData?.experience,
+        riskTolerance: parsedOnboardingData?.riskTolerance,
+        interests: parsedOnboardingData?.interests,
+        primaryGoal: parsedOnboardingData?.primaryGoal
+      });
       
       const displayName = parsedOnboardingData?.displayName || parsedOnboardingData?.name || formData.email.split('@')[0];
+
+      console.log('About to call signUp with:', {
+        email: formData.email,
+        displayName,
+        onboardingData: parsedOnboardingData
+      });
 
       const { user, error: authError } = await signUp(
         formData.email, 
@@ -110,6 +179,8 @@ const Registration = () => {
         displayName,
         parsedOnboardingData
       );
+      
+      console.log('SignUp result:', { user: !!user, error: authError });
       
       if (authError) {
         let errorMessage = '';
@@ -130,78 +201,92 @@ const Registration = () => {
       }
 
       if (user) {
+        console.log('User created successfully, UID:', user.uid);
         localStorage.setItem('needsPortfolioAnalysis', 'true');
-        if (parsedOnboardingData?.portfolioAnalysis) {
-          if (parsedOnboardingData.portfolioAnalysis.investments && parsedOnboardingData.portfolioAnalysis.investments.length > 0) {
-            for (const investment of parsedOnboardingData.portfolioAnalysis.investments) {
-              try {
-                const analysis = await analyzeInvestment(
-                  {
-                    ...investment,
-                    type: investment.type || 'Stock',
-                    name: investment.name || 'Unnamed Investment',
-                    duration: 'Long-term' 
-                  },
-                  {
-                    experience: parsedOnboardingData.experience,
-                    riskTolerance: parsedOnboardingData.riskTolerance,
-                    interests: parsedOnboardingData.interests,
-                    primaryGoal: parsedOnboardingData.primaryGoal
-                  }
-                );
-                
-                const investmentWithAnalysis = {
+        
+        // Handle investments from onboarding (only from localStorage to avoid duplicates)
+        const onboardingInvestments = JSON.parse(localStorage.getItem('onboardingInvestments') || '[]');
+        
+        console.log('Processing investments during registration:', {
+          onboardingInvestments: onboardingInvestments.length,
+          totalInvestments: onboardingInvestments.length
+        });
+        
+        if (onboardingInvestments.length > 0) {
+          for (const investment of onboardingInvestments) {
+            try {
+              const analysis = await analyzeInvestment(
+                {
                   ...investment,
-                  roiScenarios: analysis.roiScenarios || {
-                    pessimistic: (analysis.roiEstimate || 8.5) * 0.8,
-                    realistic: analysis.roiEstimate || 8.5,
-                    optimistic: (analysis.roiEstimate || 8.5) * 1.2
-                  },
-                  roiEstimate: analysis.roiEstimate || 8.5,
-                  riskScore: analysis.riskScore || 5,
-                  grade: analysis.grade || 'B',
-                  explanation: analysis.explanation || 'Investment from onboarding'
-                };
-                
-                const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithAnalysis);
-                if (investmentError) {
-                  console.error('Error saving onboarding investment:', investmentError);
+                  type: investment.type || 'Stock',
+                  name: investment.name || 'Unnamed Investment',
+                  duration: 'Long-term' 
+                },
+                {
+                  experience: parsedOnboardingData?.experience || 'beginner',
+                  riskTolerance: parsedOnboardingData?.riskTolerance || 'conservative',
+                  interests: parsedOnboardingData?.interests || ['Stocks'],
+                  primaryGoal: parsedOnboardingData?.primaryGoal || 'Long-term growth'
                 }
-              } catch (analysisError) {
-                console.error('Error analyzing investment during registration:', analysisError);
-                
-                const investmentWithBasicAnalysis = {
-                  ...investment,
-                  grade: parsedOnboardingData.portfolioAnalysis.grade || 'B',
-                  riskScore: parsedOnboardingData.portfolioAnalysis.riskScore || 5,
-                  roiEstimate: 8.5,
-                  roiScenarios: {
-                    pessimistic: 6.8,
-                    realistic: 8.5,
-                    optimistic: 10.2
-                  },
-                  explanation: parsedOnboardingData.portfolioAnalysis.summary || 'Investment from onboarding (basic analysis)'
-                };
-                
-                const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithBasicAnalysis);
-                if (investmentError) {
-                  console.error('Error saving onboarding investment with basic analysis:', investmentError);
-                }
+              );
+              
+              const investmentWithAnalysis = {
+                ...investment,
+                roiScenarios: analysis.roiScenarios || {
+                  pessimistic: (analysis.roiEstimate || 8.5) * 0.8,
+                  realistic: analysis.roiEstimate || 8.5,
+                  optimistic: (analysis.roiEstimate || 8.5) * 1.2
+                },
+                roiEstimate: analysis.roiEstimate || 8.5,
+                riskScore: analysis.riskScore || 5,
+                grade: analysis.grade || 'B',
+                explanation: analysis.explanation || 'Investment from onboarding'
+              };
+              
+              const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithAnalysis);
+              if (investmentError) {
+                console.error('Error saving onboarding investment:', investmentError);
+              } else {
+                console.log('Successfully saved investment:', investment.name);
+              }
+            } catch (analysisError) {
+              console.error('Error analyzing investment during registration:', analysisError);
+              
+              const investmentWithBasicAnalysis = {
+                ...investment,
+                grade: 'B',
+                riskScore: 5,
+                roiEstimate: 8.5,
+                roiScenarios: {
+                  pessimistic: 6.8,
+                  realistic: 8.5,
+                  optimistic: 10.2
+                },
+                explanation: 'Investment from onboarding (basic analysis)'
+              };
+              
+              const { error: investmentError } = await firebaseSaveInvestment(user.uid, investmentWithBasicAnalysis);
+              if (investmentError) {
+                console.error('Error saving onboarding investment with basic analysis:', investmentError);
+              } else {
+                console.log('Successfully saved investment with basic analysis:', investment.name);
               }
             }
           }
-          if (parsedOnboardingData && parsedOnboardingData.portfolioAnalysis && Array.isArray(parsedOnboardingData.portfolioAnalysis.investments)) {
-            localStorage.setItem('expectedInvestmentCount', parsedOnboardingData.portfolioAnalysis.investments.length.toString());
-          }
           
-          // Don't run portfolio analysis here - let Dashboard handle it after all investments are loaded
-          // The Dashboard will trigger analysis once all investments are saved and loaded
+          localStorage.setItem('expectedInvestmentCount', onboardingInvestments.length.toString());
+          console.log('Set expectedInvestmentCount to:', onboardingInvestments.length);
+          
+          // Clear the localStorage investments after saving to Firebase
+          localStorage.removeItem('onboardingInvestments');
         }
         
         localStorage.removeItem('onboardingData');
+        localStorage.removeItem('onboardingComplete'); // Clear the completion flag
         navigate('/verify-email');
       }
     } catch (err) {
+      console.error('Registration error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

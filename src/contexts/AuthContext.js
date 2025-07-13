@@ -135,11 +135,24 @@ export const AuthProvider = ({ children }) => {
   const signUp = async (email, password, displayName, onboardingData = null) => {
     try {
       setLoading(true);
+      console.log('AuthContext signUp called with:', {
+        email,
+        displayName,
+        onboardingData,
+        hasExperience: !!onboardingData?.experience,
+        hasRiskTolerance: !!onboardingData?.riskTolerance,
+        hasInterests: !!onboardingData?.interests,
+        hasPrimaryGoal: !!onboardingData?.primaryGoal
+      });
+      
       const { user: newUser, error } = await firebaseSignUp(email, password, displayName);
       
       if (error) {
+        console.error('Firebase signUp error:', error);
         throw error;
       }
+
+      console.log('Firebase user created successfully:', newUser.uid);
 
       // Create user profile in Firestore
       const profileData = {
@@ -148,10 +161,27 @@ export const AuthProvider = ({ children }) => {
         ...onboardingData
       };
 
+      console.log('Creating user profile with data:', {
+        displayName,
+        email,
+        onboardingData,
+        profileData,
+        experience: profileData.experience,
+        riskTolerance: profileData.riskTolerance,
+        interests: profileData.interests,
+        primaryGoal: profileData.primaryGoal,
+        name: profileData.name
+      });
+
       const { error: profileError } = await createUserProfile(newUser.uid, profileData);
       
       if (profileError) {
         console.error('Error creating user profile:', profileError);
+      } else {
+        console.log('User profile created successfully in Firebase');
+        // Verify the data was actually saved by fetching it back
+        const { profile: savedProfile } = await getUserProfile(newUser.uid);
+        console.log('Verified saved profile data:', savedProfile);
       }
 
       return { user: newUser, error: null };

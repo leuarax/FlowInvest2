@@ -78,6 +78,9 @@ const Dashboard = () => {
   const [portfolioAnalysisModalOpen, setPortfolioAnalysisModalOpen] = useState(false);
   const [fastAddPortfolioOpen, setFastAddPortfolioOpen] = useState(false);
   const [investmentRetryCount, setInvestmentRetryCount] = useState(0);
+  const [userManuallyClosedModal, setUserManuallyClosedModal] = useState(() => {
+    return localStorage.getItem('userManuallyClosedModal') === 'true';
+  });
   const maxInvestmentRetries = 10;
   const investmentRetryDelay = 2000;
 
@@ -152,6 +155,13 @@ const Dashboard = () => {
         throw new Error('User profile not found. Please complete your profile first.');
       }
       if (!userProfile.experience || !userProfile.riskTolerance || !userProfile.interests || !userProfile.primaryGoal) {
+        console.log('User profile incomplete:', {
+          experience: userProfile.experience,
+          riskTolerance: userProfile.riskTolerance,
+          interests: userProfile.interests,
+          primaryGoal: userProfile.primaryGoal,
+          fullProfile: userProfile
+        });
         throw new Error('User profile is incomplete. Please complete your profile first.');
       }
       console.log('About to call getPortfolioAnalysis with:', {
@@ -209,6 +219,14 @@ const Dashboard = () => {
   useEffect(() => {
     const expectedCountStr = localStorage.getItem('expectedInvestmentCount');
     const expectedCount = expectedCountStr ? parseInt(expectedCountStr, 10) : null;
+    console.log('Dashboard loading check:', {
+      userProfile: !!userProfile,
+      investmentsLength: investments?.length,
+      expectedCount,
+      investmentRetryCount,
+      maxInvestmentRetries
+    });
+    
     if (
       userProfile &&
       Array.isArray(investments) &&
@@ -217,6 +235,7 @@ const Dashboard = () => {
     ) {
       if (expectedCount !== null && !isNaN(expectedCount)) {
         if (investments.length < expectedCount && investmentRetryCount < maxInvestmentRetries) {
+          console.log(`Waiting for investments: ${investments.length}/${expectedCount}, retry ${investmentRetryCount}/${maxInvestmentRetries}`);
           setTimeout(() => {
             setInvestmentRetryCount((prev) => prev + 1);
             loadInvestments();
@@ -224,8 +243,22 @@ const Dashboard = () => {
           return;
         }
       }
-      // Only set loading to false if we have the expected number of investments or no expected count
-      if (expectedCount === null || investments.length >= expectedCount) {
+      // Set loading to false if we have the expected number of investments, no expected count, or no investments (new user)
+      if (expectedCount === null || investments.length >= expectedCount || investments.length === 0) {
+        console.log('Setting loading to false:', {
+          expectedCount,
+          investmentsLength: investments.length,
+          reason: expectedCount === null ? 'no expected count' : 
+                  investments.length >= expectedCount ? 'has expected investments' : 
+                  'no investments (new user)'
+        });
+        
+        // If we have no investments but expected some, clear the expected count for new users
+        if (investments.length === 0 && expectedCount !== null && investmentRetryCount >= maxInvestmentRetries) {
+          console.log('Clearing expectedInvestmentCount for new user with no investments');
+          localStorage.removeItem('expectedInvestmentCount');
+        }
+        
         setLoading(false);
       }
     }
@@ -268,8 +301,22 @@ const Dashboard = () => {
     } else if (!needsAnalysis && hasExpectedInvestments && investments.length > 0) {
       // If no analysis is needed but we have all investments, complete the flow
       setAutoAnalysisComplete(true);
+    } else if (hasExpectedInvestments && investments.length > 0) {
+      // If we have investments but no analysis flag, still complete the flow
+      setAutoAnalysisComplete(true);
     }
   }, [portfolioAnalysisModalOpen, handleGetPortfolioAnalysis, investments]);
+
+  // Show portfolio analysis modal if there's existing analysis from onboarding
+  useEffect(() => {
+    if (portfolioAnalysis && !portfolioAnalysisModalOpen && !loading && investments.length > 0 && !userManuallyClosedModal) {
+      // If there's existing portfolio analysis and we have investments, show the analysis
+      setPortfolioAnalysisModalOpen(true);
+      setAutoAnalysisComplete(true);
+      // Clear the needs analysis flag since we're showing existing analysis
+      localStorage.removeItem('needsPortfolioAnalysis');
+    }
+  }, [portfolioAnalysis, portfolioAnalysisModalOpen, loading, investments, userManuallyClosedModal]);
 
   const handleOpenStressTest = () => setStressTestOpen(true);
   const handleCloseStressTest = () => {
@@ -467,9 +514,14 @@ const Dashboard = () => {
   console.log('DEBUG: portfolioAnalysis.riskScore =', portfolioAnalysis && portfolioAnalysis.riskScore);
 
   const handleClosePortfolioAnalysisModal = () => {
+    console.log('handleClosePortfolioAnalysisModal called');
+    console.log('Current portfolioAnalysisModalOpen state:', portfolioAnalysisModalOpen);
     setPortfolioAnalysisModalOpen(false);
+    setUserManuallyClosedModal(true); // Prevent modal from re-opening
+    localStorage.setItem('userManuallyClosedModal', 'true'); // Persist the close state
     localStorage.removeItem('needsPortfolioAnalysis');
     console.log('Removed needsPortfolioAnalysis flag from localStorage');
+    console.log('Set portfolioAnalysisModalOpen to false');
   };
 
   const handleAddInvestments = async (selectedInvestments) => {
@@ -583,13 +635,13 @@ const Dashboard = () => {
                     alignItems: 'center',
                     gap: 2,
                     cursor: 'pointer',
-                    backgroundColor: '#F9FAFB',
-                    border: '1px solid #E5E7EB',
+                    backgroundColor: '#F8F7FF',
+                    border: '1px solid #E9E5FF',
                     borderRadius: '12px',
                     px: 3,
                     py: 2,
                     '&:hover': {
-                      backgroundColor: '#F3F4F6'
+                      backgroundColor: '#F0EDFF'
                     }
                   }}
                 >
@@ -1064,7 +1116,7 @@ const Dashboard = () => {
                       }}>
                         {(() => {
                           const score = Number(portfolioAnalysis.riskScore);
-                          return !isNaN(score) && score > 0 ? `${score}/10` : 'N/A';
+                          return !isNaN(score) && score > 0 ? `${Math.round(score)}/10` : 'N/A';
                         })()}
                       </Typography>
                     </Box>
@@ -1522,7 +1574,7 @@ const Dashboard = () => {
                                 fontSize: '1.25rem'
                               }}
                             >
-                              {stressTestAnalysis.riskScore || 'N/A'}/10
+                              {Math.round(stressTestAnalysis.riskScore) || 'N/A'}/10
                             </Typography>
                             <Typography 
                               sx={{ 

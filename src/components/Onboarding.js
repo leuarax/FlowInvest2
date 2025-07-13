@@ -226,15 +226,19 @@ const Onboarding = () => {
       // (completion is handled in the final button click)
       const isCompleting = localStorage.getItem('onboardingStep') === '7' && 
                           localStorage.getItem('onboardingData');
-      if (!isCompleting) {
+      const isNavigatingToRegistration = window.location.pathname === '/registration';
+      const onboardingComplete = localStorage.getItem('onboardingComplete') === 'true';
+      
+      if (!isCompleting && !isNavigatingToRegistration && !onboardingComplete) {
         // Keep the data for a short time in case user navigates back
         setTimeout(() => {
-          if (!window.location.pathname.includes('/onboarding')) {
+          if (!window.location.pathname.includes('/onboarding') && 
+              !window.location.pathname.includes('/registration')) {
             localStorage.removeItem('onboardingStep');
             localStorage.removeItem('onboardingData');
             localStorage.removeItem('randomizedReferralOptions');
           }
-        }, 5000); // Clear after 5 seconds if not on onboarding page
+        }, 5000); // Clear after 5 seconds if not on onboarding or registration page
       }
     };
   }, []);
@@ -327,8 +331,25 @@ const Onboarding = () => {
     setFormData(prev => ({ ...prev, analysisLoading: true }));
     
     try {
+      console.log('=== ANALYZE SCREENSHOT START ===');
+      console.log('Current user state:', user);
+      console.log('Form data userId:', formData.userId);
+      console.log('User from context:', user?.uid);
+      
       const screenshotFormData = new FormData();
       screenshotFormData.append('screenshot', formData.screenshotFile);
+      
+      // Debug logging
+      console.log('File being uploaded:', {
+        name: formData.screenshotFile.name,
+        type: formData.screenshotFile.type,
+        size: formData.screenshotFile.size
+      });
+      console.log('FormData entries:');
+      for (let [key, value] of screenshotFormData.entries()) {
+        console.log(key, value);
+      }
+      
       let recognitionResponse;
       try {
         recognitionResponse = await fetch('http://localhost:3001/api/batch-screenshot', {
@@ -351,7 +372,28 @@ const Onboarding = () => {
       }
       if (!recognitionResponse.ok) {
         const errorText = await recognitionResponse.text();
-        throw new Error(`Failed to recognize screenshot: ${recognitionResponse.status} - ${errorText}`);
+        console.log('Server response status:', recognitionResponse.status);
+        console.log('Server response headers:', recognitionResponse.headers);
+        console.log('Server response text:', errorText);
+        
+        let errorMessage = `Failed to recognize screenshot: ${recognitionResponse.status}`;
+        
+        // Check if response is HTML (error page)
+        if (errorText.includes('<!DOCTYPE html>') || errorText.includes('<html>')) {
+          errorMessage = 'Server error - received HTML response instead of JSON';
+        } else {
+          try {
+            const errorData = JSON.parse(errorText);
+            if (errorData.error) {
+              errorMessage = errorData.error;
+            }
+          } catch (e) {
+            // If JSON parsing fails, use the raw error text
+            errorMessage = errorText || errorMessage;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
       const recognitionJson = await recognitionResponse.json();
       let recognizedInvestments = recognitionJson.data || [];
@@ -365,11 +407,30 @@ const Onboarding = () => {
       }
       if (Array.isArray(recognizedInvestments) && recognizedInvestments.length > 0) {
         const userId = formData.userId || (typeof user !== 'undefined' && user ? user.uid : null);
+        console.log('Processing investments. User ID:', userId);
+        console.log('Investments to process:', recognizedInvestments);
+        
         if (userId) {
+          // User is authenticated, save to Firebase
+          console.log('User authenticated, saving to Firebase');
           for (const inv of recognizedInvestments) {
-            await saveInvestment(userId, inv);
+            console.log('Saving investment to Firebase:', inv.name);
+            const result = await saveInvestment(userId, inv);
+            console.log('Save result for', inv.name, ':', result);
+            if (result.error) {
+              console.error('Error saving investment:', inv.name, result.error);
+            }
           }
           localStorage.setItem('expectedInvestmentCount', recognizedInvestments.length.toString());
+          console.log('Set expectedInvestmentCount to:', recognizedInvestments.length);
+        } else {
+          // User not authenticated yet, save to localStorage for later
+          console.log('User not authenticated, saving to localStorage for registration');
+          const existingInvestments = JSON.parse(localStorage.getItem('onboardingInvestments') || '[]');
+          const updatedInvestments = [...existingInvestments, ...recognizedInvestments];
+          localStorage.setItem('onboardingInvestments', JSON.stringify(updatedInvestments));
+          localStorage.setItem('expectedInvestmentCount', updatedInvestments.length.toString());
+          console.log('Saved investments to localStorage:', updatedInvestments.length);
         }
       }
       const previewFormData = new FormData();
@@ -418,6 +479,23 @@ const Onboarding = () => {
     } catch (error) {
       console.error('Error analyzing screenshot:', error);
       setFormData(prev => ({ ...prev, analysisLoading: false }));
+      
+      // Show user-friendly error message
+      let errorMessage = 'Failed to analyze screenshot. Please try again.';
+      
+      if (error.message.includes('File too large')) {
+        errorMessage = 'Image file is too large. Please upload a smaller image (under 10MB).';
+      } else if (error.message.includes('Only image files are allowed')) {
+        errorMessage = 'Please upload an image file (JPEG, PNG, etc.).';
+      } else if (error.message.includes('Unexpected end of form')) {
+        errorMessage = 'Upload was interrupted. Please try again with a smaller image.';
+      } else if (error.message.includes('No valid investments found')) {
+        errorMessage = 'No investments could be recognized from your screenshot. Please try another image.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -459,6 +537,15 @@ const Onboarding = () => {
       portfolioAnalysis: null,
       analysisLoading: false,
     };
+    
+    console.log('Saving onboarding data to localStorage:', {
+      dataToSave,
+      hasExperience: !!dataToSave.experience,
+      hasRiskTolerance: !!dataToSave.riskTolerance,
+      hasInterests: !!dataToSave.interests,
+      hasPrimaryGoal: !!dataToSave.primaryGoal
+    });
+    
     localStorage.setItem('onboardingData', JSON.stringify(dataToSave));
 
     const newStep = currentStep + 1;
@@ -998,7 +1085,7 @@ const Onboarding = () => {
                     }}>
                       {(() => {
                         const score = Number(formData.portfolioAnalysis.riskScore);
-                        return !isNaN(score) && score > 0 ? `${score}/10` : 'N/A';
+                        return !isNaN(score) && score > 0 ? `${Math.round(score)}/10` : 'N/A';
                       })()}
                     </Typography>
                   </Box>
@@ -1020,7 +1107,7 @@ const Onboarding = () => {
                 <Typography variant="body2" sx={{ color: '#6B7280', fontStyle: 'italic', mb: 2 }}>
                   Risk Level: {formData.portfolioAnalysis.riskScore >= 7 ? 'High' : 
                               formData.portfolioAnalysis.riskScore >= 5 ? 'Moderate' : 'Low'} 
-                  ({formData.portfolioAnalysis.riskScore}/10)
+                  ({Math.round(formData.portfolioAnalysis.riskScore)}/10)
                 </Typography>
                 
                 <Box sx={{ 
@@ -1165,7 +1252,21 @@ const Onboarding = () => {
                 onClick={() => {
                   setLoading(true);
                   try {
+                    console.log('Final onboarding step - formData being saved:', {
+                      formData,
+                      experience: formData.experience,
+                      riskTolerance: formData.riskTolerance,
+                      interests: formData.interests,
+                      primaryGoal: formData.primaryGoal,
+                      name: formData.name
+                    });
+                    
                     localStorage.setItem('onboardingData', JSON.stringify(formData));
+                    console.log('onboardingData saved to localStorage');
+                    
+                    // Set a flag to prevent cleanup from clearing the data
+                    localStorage.setItem('onboardingComplete', 'true');
+                    
                     // Clear onboarding step since user is completing the flow
                     localStorage.removeItem('onboardingStep');
                     localStorage.removeItem('randomizedReferralOptions');

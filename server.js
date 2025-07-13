@@ -2,7 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer');
+
 const investmentHandler = require('./api/investment.js');
 const portfolioHandler = require('./api/portfolio.js');
 const batchScreenshotHandler = require('./api/batch-screenshot.js');
@@ -14,7 +14,7 @@ const analyzeScreenshot = require('./api/screenshot.js');
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Middleware
+// CORS middleware must come FIRST
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://flow-invest2-hpr3.vercel.app' 
@@ -23,8 +23,33 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// File upload routes must come BEFORE any middleware that might interfere with the request body
+app.post('/api/batch-screenshot', batchScreenshotHandler);
+app.options('/api/batch-screenshot', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+app.post('/api/screenshot', analyzeScreenshot);
+app.post('/api/analyze-screenshot', analyzeScreenshot);
+// Middleware for parsing JSON and URL-encoded data, but exclude file upload routes
+app.use((req, res, next) => {
+  // Skip body parsing for file upload routes
+  if (req.path.includes('/batch-screenshot') || req.path.includes('/screenshot') || req.path.includes('/analyze-screenshot')) {
+    return next();
+  }
+  express.json()(req, res, next);
+});
+
+app.use((req, res, next) => {
+  // Skip URL-encoded parsing for file upload routes
+  if (req.path.includes('/batch-screenshot') || req.path.includes('/screenshot') || req.path.includes('/analyze-screenshot')) {
+    return next();
+  }
+  express.urlencoded({ extended: true })(req, res, next);
+});
 
 // API routes
 app.post('/api/investment', (req, res, next) => {
@@ -56,14 +81,6 @@ app.post('/api/analyze-portfolio', (req, res, next) => {
   });
   analyzePortfolioHandler(req, res).catch(next);
 });
-
-const upload = multer({ dest: 'uploads/' });
-// Batch screenshot recognition endpoint
-app.post('/api/batch-screenshot', upload.any(), batchScreenshotHandler);
-// Screenshot recognition endpoint
-app.post('/api/screenshot', analyzeScreenshot);
-// Analyze screenshot endpoint (for InvestmentForm)
-app.post('/api/analyze-screenshot', analyzeScreenshot);
 
 // Test JSON parsing
 app.post('/api/test-json', (req, res) => {

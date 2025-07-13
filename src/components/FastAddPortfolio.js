@@ -18,11 +18,7 @@ import {
   Checkbox,
   IconButton,
   Chip,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction
+  LinearProgress
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import CloseIcon from '@mui/icons-material/Close';
@@ -197,17 +193,12 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           console.log('Trying local server at http://localhost:3001/api/screenshot...');
           fileData = await makeRequest('http://localhost:3001/api/screenshot', file);
         } catch (err) {
-          console.log('Local server failed, trying production URL...', err);
+          console.log('Local server failed, trying Vercel fallback...', err);
           try {
-            fileData = await makeRequest('/api/screenshot', file);
-          } catch (prodErr) {
-            console.log('Production URL failed, trying Vercel fallback...', prodErr);
-            try {
-              fileData = await makeRequest('https://flow-invest2-hpr3.vercel.app/api/screenshot', file);
-            } catch (vercelErr) {
-              console.error('All endpoints failed for file:', file.name, { local: err.message, production: prodErr.message, vercel: vercelErr.message });
-              throw new Error(`API endpoints unavailable for file ${file.name}. Please ensure the local server is running (npm run server) or try again later. Local error: ${err.message}`);
-            }
+            fileData = await makeRequest('https://flow-invest2-hpr3.vercel.app/api/screenshot', file);
+          } catch (vercelErr) {
+            console.error('All endpoints failed for file:', file.name, { local: err.message, vercel: vercelErr.message });
+            throw new Error(`API endpoints unavailable for file ${file.name}. Please ensure the local server is running (npm run server) or try again later. Local error: ${err.message}`);
           }
         }
 
@@ -435,7 +426,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           onDrop={handleDrop}
           sx={{ 
             textAlign: 'center', 
-            p: 6,
+            p: previews.length > 0 ? 3 : 6,
             background: dragActive 
               ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%)' 
               : 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)',
@@ -454,51 +445,145 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           }}
           onClick={() => document.getElementById('file-input').click()}
         >
-          <CloudUploadIcon 
-            sx={{ 
-              fontSize: 48, 
-              color: '#667eea', 
-              mb: 2,
-              opacity: dragActive ? 0.8 : 1
-            }} 
-          />
-          
-          <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
-            📥 Drag & drop or click to upload
-          </Typography>
-          
-          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
-            PNG, JPG or PDF · Max 10 MB · Up to 5 files
-          </Typography>
-          
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-            <LockIcon sx={{ fontSize: 16, color: '#10b981', mr: 1 }} />
-            <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
-              Images processed locally — nothing ever leaves your browser.
-            </Typography>
-          </Box>
+          {previews.length === 0 ? (
+            <>
+              <CloudUploadIcon 
+                sx={{ 
+                  fontSize: 48, 
+                  color: '#667eea', 
+                  mb: 2,
+                  opacity: dragActive ? 0.8 : 1
+                }} 
+              />
+              
+              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 1 }}>
+                📥 Drag & drop or click to upload
+              </Typography>
+              
+              <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+                PNG, JPG or PDF · Max 10 MB · Up to 5 files
+              </Typography>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+                <LockIcon sx={{ fontSize: 16, color: '#10b981', mr: 1 }} />
+                <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  Images processed locally — nothing ever leaves your browser.
+                </Typography>
+              </Box>
 
-          {/* See a sample screenshot button */}
-          <Button
-            variant="text"
-            startIcon={<HelpOutlineIcon />}
-            sx={{
-              color: '#667eea',
-              textTransform: 'none',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              mb: 1,
-              '&:hover': {
-                background: 'rgba(102, 126, 234, 0.08)'
-              }
-            }}
-            onClick={e => {
-              e.stopPropagation();
-              setSampleOpen(true);
-            }}
-          >
-            See a sample screenshot
-          </Button>
+              {/* See a sample screenshot button */}
+              <Button
+                variant="text"
+                startIcon={<HelpOutlineIcon />}
+                sx={{
+                  color: '#667eea',
+                  textTransform: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  mb: 1,
+                  '&:hover': {
+                    background: 'rgba(102, 126, 234, 0.08)'
+                  }
+                }}
+                onClick={e => {
+                  e.stopPropagation();
+                  setSampleOpen(true);
+                }}
+              >
+                See a sample screenshot
+              </Button>
+            </>
+          ) : (
+            <>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                  📁 Uploaded Files ({previews.length})
+                </Typography>
+                <Button 
+                  startIcon={<ClearIcon />} 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClear();
+                  }} 
+                  size="small"
+                  sx={{
+                    color: '#ef4444',
+                    borderColor: '#ef4444',
+                    '&:hover': {
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      borderColor: '#dc2626'
+                    }
+                  }}
+                  variant="outlined"
+                >
+                  Clear All
+                </Button>
+              </Box>
+              
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+                gap: 2,
+                mb: 2
+              }}>
+                {previews.map((preview, index) => (
+                  <Paper
+                    key={index}
+                    sx={{
+                      p: 2,
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(102, 126, 234, 0.2)',
+                      borderRadius: '8px',
+                      position: 'relative',
+                      '&:hover': {
+                        background: 'rgba(255, 255, 255, 1)',
+                        boxShadow: '0 2px 8px rgba(102, 126, 234, 0.15)'
+                      }
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <img
+                        src={preview.url}
+                        alt={`Preview ${index + 1}`}
+                        style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          borderRadius: '6px',
+                          objectFit: 'cover',
+                          border: '1px solid rgba(102, 126, 234, 0.2)'
+                        }}
+                      />
+                      <Box sx={{ ml: 1, flex: 1 }}>
+                        <Typography variant="caption" sx={{ color: '#10b981', fontWeight: 500 }}>
+                          {formatFileSize(preview.size)} • Ready
+                        </Typography>
+                      </Box>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFile(index);
+                        }}
+                        sx={{
+                          color: '#ef4444',
+                          p: 0.5,
+                          '&:hover': {
+                            background: 'rgba(239, 68, 68, 0.1)'
+                          }
+                        }}
+                      >
+                        <DeleteIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Box>
+                  </Paper>
+                ))}
+              </Box>
+              
+              <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
+                Click to add more files or drag & drop additional files
+              </Typography>
+            </>
+          )}
           
           <input 
             id="file-input"
@@ -510,90 +595,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
           />
         </Box>
 
-        {/* File List - Only show after files are selected */}
-        {previews.length > 0 && (
-          <Box sx={{ mb: 4 }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-              <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                Uploaded Files ({previews.length})
-              </Typography>
-              <Button 
-                startIcon={<ClearIcon />} 
-                onClick={handleClear} 
-                size="small"
-                sx={{
-                  color: '#ef4444',
-                  borderColor: '#ef4444',
-                  '&:hover': {
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    borderColor: '#dc2626'
-                  }
-                }}
-                variant="outlined"
-              >
-                Clear All
-              </Button>
-            </Box>
-            
-            <Paper sx={{
-              background: 'rgba(248, 250, 252, 0.8)',
-              border: '1px solid rgba(226, 232, 240, 0.8)',
-              borderRadius: '12px',
-              overflow: 'hidden'
-            }}>
-              <List sx={{ p: 0 }}>
-                {previews.map((preview, index) => (
-                  <ListItem 
-                    key={index}
-                    sx={{
-                      borderBottom: index < previews.length - 1 ? '1px solid rgba(226, 232, 240, 0.8)' : 'none',
-                      '&:hover': {
-                        background: 'rgba(102, 126, 234, 0.05)'
-                      }
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-                      <img
-                        src={preview.url}
-                        alt={`Preview ${index + 1}`}
-                        style={{ 
-                          width: '40px', 
-                          height: '40px', 
-                          borderRadius: '6px',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    </Box>
-                    <ListItemText
-                      primary={preview.name}
-                      secondary={formatFileSize(preview.size)}
-                      primaryTypographyProps={{
-                        sx: { fontWeight: 600, color: '#1e293b' }
-                      }}
-                      secondaryTypographyProps={{
-                        sx: { color: '#64748b', fontSize: '0.875rem' }
-                      }}
-                    />
-                    <ListItemSecondaryAction>
-                      <IconButton
-                        edge="end"
-                        onClick={() => removeFile(index)}
-                        sx={{
-                          color: '#ef4444',
-                          '&:hover': {
-                            background: 'rgba(239, 68, 68, 0.1)'
-                          }
-                        }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
-          </Box>
-        )}
+
 
         {/* Processing Progress */}
         {loading && (
@@ -799,6 +801,9 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
               borderColor: '#667eea',
               fontWeight: 600,
               textTransform: 'none',
+              fontSize: { xs: '0.75rem', sm: '0.875rem' },
+              px: { xs: 1.5, sm: 2 },
+              minWidth: { xs: 'auto', sm: 'auto' },
               '&:hover': {
                 background: 'rgba(102, 126, 234, 0.1)',
                 borderColor: '#5a67d8'
@@ -818,10 +823,7 @@ export default function FastAddPortfolio({ open, onClose, onAddInvestments, user
             (loading || addLoading) ? null : 
             investments.length > 0 ? <AddIcon /> : <AnalyticsIcon />
           }
-          endIcon={
-            !loading && !addLoading && investments.length === 0 ? 
-            <span style={{ fontSize: '14px' }}>▶</span> : null
-          }
+
           sx={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             borderRadius: '12px',
