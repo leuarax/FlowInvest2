@@ -142,7 +142,6 @@ const Dashboard = () => {
   }, [getUserInvestments]);
 
   const handleGetPortfolioAnalysis = useCallback(async () => {
-    setLoading(true);
     setPortfolioAnalysisLoading(true);
     setHasHadAnalysis(true);
     try {
@@ -180,7 +179,6 @@ const Dashboard = () => {
       setTimeout(() => {
         console.log('Context portfolioAnalysis after set:', analysis);
       }, 100);
-      setLoading(false);
       setAutoAnalysisComplete(true);
     } catch (err) {
       console.error('Portfolio analysis error:', err);
@@ -190,7 +188,6 @@ const Dashboard = () => {
         errorMessage: err.message,
         errorStack: err.stack
       });
-      setLoading(false);
       setAutoAnalysisComplete(true);
     } finally {
       setPortfolioAnalysisLoading(false);
@@ -278,13 +275,24 @@ const Dashboard = () => {
     const expectedCount = expectedCountStr ? parseInt(expectedCountStr, 10) : null;
     const hasExpectedInvestments = expectedCount === null || investments.length >= expectedCount;
     
+    // Only trigger portfolio analysis if:
+    // 1. Not loading (investments are loaded)
+    // 2. First load
+    // 3. Have expected investments (all investments saved to Firebase)
+    // 4. Have investments
+    // 5. Have user profile
+    // 6. No existing portfolio analysis
+    // 7. Not currently analyzing
+    // 8. Banner not dismissed
+    // 9. Haven't had analysis yet
     if (!loading && isFirstLoad && hasExpectedInvestments && investments.length > 0 && userProfile && !portfolioAnalysis && !portfolioAnalysisLoading && !expandBannerDismissed && !hasHadAnalysis) {
-      console.log('Auto-triggering portfolio analysis on first load');
+      console.log('Auto-triggering portfolio analysis on first load - all investments confirmed saved to Firebase');
       setIsFirstLoad(false);
       setHasHadAnalysis(true);
       handleGetPortfolioAnalysis();
     } else if (!loading && isFirstLoad && hasExpectedInvestments && investments.length > 0 && userProfile && !expandBannerDismissed && !hasHadAnalysis) {
       // If we have all investments but no analysis is needed, still complete the flow
+      console.log('Completing flow without analysis - all investments confirmed saved to Firebase');
       setIsFirstLoad(false);
       setAutoAnalysisComplete(true);
     }
@@ -296,13 +304,17 @@ const Dashboard = () => {
     const expectedCount = expectedCountStr ? parseInt(expectedCountStr, 10) : null;
     const hasExpectedInvestments = expectedCount === null || investments.length >= expectedCount;
     
+    // Only trigger analysis if we have all expected investments saved to Firebase
     if (needsAnalysis && !portfolioAnalysisModalOpen && hasExpectedInvestments && investments.length > 0) {
+      console.log('Triggering portfolio analysis - all investments confirmed saved to Firebase');
       handleGetPortfolioAnalysis();
     } else if (!needsAnalysis && hasExpectedInvestments && investments.length > 0) {
       // If no analysis is needed but we have all investments, complete the flow
+      console.log('Completing flow without analysis - all investments confirmed saved to Firebase');
       setAutoAnalysisComplete(true);
     } else if (hasExpectedInvestments && investments.length > 0) {
       // If we have investments but no analysis flag, still complete the flow
+      console.log('Completing flow - all investments confirmed saved to Firebase');
       setAutoAnalysisComplete(true);
     }
   }, [portfolioAnalysisModalOpen, handleGetPortfolioAnalysis, investments]);
@@ -490,7 +502,7 @@ const Dashboard = () => {
       }}>
         <CircularProgress sx={{ color: '#8B5CF6' }} />
         <Typography variant="h6" sx={{ ml: 2, color: '#1F2937', fontWeight: 500 }}>
-          Analyzing your portfolio...
+          {portfolioAnalysisLoading ? 'Analyzing your portfolio...' : 'Loading your portfolio...'}
         </Typography>
       </Box>
     );
