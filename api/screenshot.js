@@ -3,21 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const OpenAI = require('openai');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+// Configure multer for file uploads - use memory storage for Vercel
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 });
-
-const upload = multer({ storage });
 
 // Initialize OpenAI with the API key
 const openai = new OpenAI({
@@ -35,9 +27,8 @@ async function analyzeScreenshot(req, res) {
     const additionalNotes = req.body.additionalNotes || '';
     const userProfile = req.body.userProfile ? JSON.parse(req.body.userProfile) : null;
 
-    // Read the image file
-    imagePath = path.join(__dirname, '../uploads', req.file.filename);
-    const imageBuffer = fs.readFileSync(imagePath);
+    // Read the image file from memory
+    const imageBuffer = req.file.buffer;
     const base64Image = imageBuffer.toString('base64');
 
     // Prepare the prompt
@@ -239,15 +230,21 @@ Return a single, valid JSON array. Each element in the array MUST be a JSON obje
       details: error.message 
     });
   } finally {
-    // Clean up the uploaded file
-    if (imagePath && fs.existsSync(imagePath)) {
-      try {
-        fs.unlinkSync(imagePath);
-      } catch (e) {
-        console.error('Error cleaning up file:', e);
-      }
-    }
+    // No cleanup needed for memory storage
   }
 }
 
-module.exports = [upload.single('screenshot'), analyzeScreenshot];
+module.exports = async (req, res) => {
+  // Handle file upload with multer
+  upload.single('screenshot')(req, res, async (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ 
+        error: 'File upload error',
+        details: err.message
+      });
+    }
+    
+    await analyzeScreenshot(req, res);
+  });
+};

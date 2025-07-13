@@ -1,6 +1,16 @@
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const path = require('path');
 const OpenAI = require('openai');
+const multer = require('multer');
+
+// Configure multer for file uploads - use memory storage for Vercel
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
 
 // Initialize OpenAI
 const openai = new OpenAI({
@@ -9,23 +19,43 @@ const openai = new OpenAI({
 });
 
 module.exports = async (req, res) => {
-  console.log('Received request to analyze portfolio screenshots');
-  console.log('Request body keys:', Object.keys(req.body || {}));
-  console.log('User profile in request:', req.body?.userProfile);
-  
-  // Accept both 'screenshot' (single file) and 'screenshots' (multiple files)
-  let files = [];
-  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-    files = req.files;
-  } else if (req.file) {
-    files = [req.file];
-  }
-  if (!files || files.length === 0) {
-    return res.status(400).json({ 
-      error: 'No files uploaded',
-      details: 'Please ensure you are sending files with the key "screenshots" or "screenshot"'
-    });
-  }
+  // Handle file upload with multer - support both 'screenshot' and 'screenshots' field names
+  upload.fields([
+    { name: 'screenshot', maxCount: 1 },
+    { name: 'screenshots', maxCount: 10 }
+  ])(req, res, async (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ 
+        error: 'File upload error',
+        details: err.message
+      });
+    }
+
+    console.log('Received request to analyze portfolio screenshots');
+    console.log('Request body keys:', Object.keys(req.body || {}));
+    console.log('User profile in request:', req.body?.userProfile);
+    
+    // Extract files from multer fields structure
+    let files = [];
+    if (req.files) {
+      if (req.files.screenshot && req.files.screenshot.length > 0) {
+        files = files.concat(req.files.screenshot);
+      }
+      if (req.files.screenshots && req.files.screenshots.length > 0) {
+        files = files.concat(req.files.screenshots);
+      }
+    }
+    // Fallback for backward compatibility
+    if (files.length === 0 && req.file) {
+      files = [req.file];
+    }
+    if (!files || files.length === 0) {
+      return res.status(400).json({ 
+        error: 'No files uploaded',
+        details: 'Please ensure you are sending files with the key "screenshots" or "screenshot"'
+      });
+    }
 
   try {
     // Process all uploaded files
@@ -34,9 +64,9 @@ module.exports = async (req, res) => {
     for (const file of files) {
       console.log('Processing file:', file.originalname);
       
-      // Read the uploaded file
-      console.log('Reading uploaded file from:', file.path);
-      const imageBuffer = await fs.readFile(file.path);
+      // Read the uploaded file from memory
+      console.log('Reading uploaded file from memory');
+      const imageBuffer = file.buffer;
       const base64Image = imageBuffer.toString('base64');
       
       if (!base64Image || base64Image.length < 100) {
@@ -83,8 +113,7 @@ Return a JSON array of investment objects. Only include data that is clearly vis
 
       console.log('Received batch analysis from OpenAI for file:', file.originalname);
 
-        // Clean up the uploaded file
-        await fs.unlink(file.path).catch(e => console.error('Error deleting temp file:', e));
+        // No cleanup needed for memory storage
 
         // Parse the AI response
         console.log('Received response from OpenAI');
@@ -348,4 +377,5 @@ Return a JSON array of investment objects. Only include data that is clearly vis
       type: error.type
     });
   }
+  });
 };

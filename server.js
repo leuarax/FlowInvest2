@@ -17,7 +17,7 @@ const port = process.env.PORT || 3001;
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? 'https://flowinvest2.vercel.app' 
+    ? 'https://flow-invest2-hpr3.vercel.app' 
     : ['http://localhost:3000', 'http://localhost:3001', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -61,7 +61,9 @@ const upload = multer({ dest: 'uploads/' });
 // Batch screenshot recognition endpoint
 app.post('/api/batch-screenshot', upload.any(), batchScreenshotHandler);
 // Screenshot recognition endpoint
-app.post('/api/screenshot', ...analyzeScreenshot);
+app.post('/api/screenshot', analyzeScreenshot);
+// Analyze screenshot endpoint (for InvestmentForm)
+app.post('/api/analyze-screenshot', analyzeScreenshot);
 
 // Test JSON parsing
 app.post('/api/test-json', (req, res) => {

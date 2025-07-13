@@ -8,7 +8,7 @@ const path = require('path');
 // __filename and __dirname are already available in CommonJS
 
 // Import the Express app from server.js
-const app = require('../scripts/server');
+const app = require('../server');
 
 // Create Vercel serverless function
 module.exports = async function handler(req, res) {

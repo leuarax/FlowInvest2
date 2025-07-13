@@ -25,6 +25,13 @@ const LandingPage = () => {
     setAnimationTrigger(true);
   }, []);
 
+  // Clear onboarding localStorage when landing page loads
+  useEffect(() => {
+    localStorage.removeItem('onboardingStep');
+    localStorage.removeItem('onboardingData');
+    localStorage.removeItem('randomizedReferralOptions');
+  }, []);
+
   const handleGetStarted = () => {
     navigate('/onboarding');
   };

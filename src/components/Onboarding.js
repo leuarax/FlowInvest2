@@ -12,8 +12,6 @@ import {
   CircularProgress,
   Checkbox,
   Paper,
-  Select,
-  MenuItem,
   FormHelperText,
   InputAdornment
 } from '@mui/material';
@@ -27,8 +25,8 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import { saveInvestment } from '../utils/firebase';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import InsightsIcon from '@mui/icons-material/Insights';
+// import TrendingUpIcon from '@mui/icons-material/TrendingUp'; // Remove if not used
+// import InsightsIcon from '@mui/icons-material/Insights'; // Remove if not used
 
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -48,6 +46,141 @@ const Onboarding = () => {
     portfolioAnalysis: null,
     analysisLoading: false,
   });
+  const [randomizedReferralOptions, setRandomizedReferralOptions] = useState([]);
+
+  const referralOptions = React.useMemo(() => [
+    { value: 'instagram', label: 'Instagram', description: 'Found us through social media content' },
+    { value: 'tiktok', label: 'TikTok', description: 'Discovered us on TikTok' },
+    { value: 'friend_recommendation', label: 'Friend Recommendation', description: 'Recommended by someone I know' },
+    { value: 'search_engine', label: 'Search Engine', description: 'Found through Google or other search engines' },
+    { value: 'blog_article', label: 'Blog/Article', description: 'Read about us in an article or blog post' },
+    { value: 'podcast', label: 'Podcast', description: 'Heard about us on a podcast' },
+    { value: 'other', label: 'Other', description: 'Another way not listed above' },
+  ], []);
+
+  // Function to get randomized referral options (excluding "other" which stays at the end)
+  const getRandomizedReferralOptions = React.useCallback(() => {
+    const optionsWithoutOther = referralOptions.filter(option => option.value !== 'other');
+    const otherOption = referralOptions.find(option => option.value === 'other');
+    
+    // Shuffle the options excluding "other"
+    const shuffledOptions = optionsWithoutOther.sort(() => Math.random() - 0.5);
+    
+    // Add "other" at the end
+    return [...shuffledOptions, otherOption];
+  }, [referralOptions]);
+
+  const benefits = [
+    {
+      title: "Smart Portfolio Analysis",
+      description: "Get AI-powered insights into your investment portfolio with detailed risk assessment and performance analysis.",
+      icon: <AnalyticsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
+    },
+    {
+      title: "Personalized Strategy",
+      description: "Receive tailored investment recommendations based on your risk tolerance, goals, and market conditions.",
+      icon: <AnalyticsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} /> // Use AnalyticsIcon or replace with InsightsIcon if needed
+    },
+    {
+      title: "Portfolio Stress Test",
+      description: "Test your portfolio against various market scenarios to understand potential risks and prepare for different economic conditions.",
+      icon: <AnalyticsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} /> // Use AnalyticsIcon or replace with TrendingUpIcon if needed
+    }
+  ];
+
+  // Save current step to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('onboardingStep', currentStep.toString());
+  }, [currentStep]);
+
+  // Restore onboarding state from localStorage on component mount
+  useEffect(() => {
+    const savedStep = localStorage.getItem('onboardingStep');
+    const savedFormData = localStorage.getItem('onboardingData');
+    const savedRandomizedOptions = localStorage.getItem('randomizedReferralOptions');
+    
+    if (savedStep) {
+      setCurrentStep(parseInt(savedStep, 10));
+    }
+    
+    if (savedFormData) {
+      try {
+        const parsedData = JSON.parse(savedFormData);
+        setFormData(prevData => ({
+          ...prevData,
+          ...parsedData,
+          // Don't restore file-related data as it can't be serialized
+          screenshotFile: null,
+          screenshotPreview: null,
+          portfolioAnalysis: null,
+          analysisLoading: false,
+        }));
+      } catch (error) {
+        console.error('Error parsing saved onboarding data:', error);
+      }
+    }
+    
+    // Initialize or restore randomized referral options
+    if (savedRandomizedOptions) {
+      try {
+        setRandomizedReferralOptions(JSON.parse(savedRandomizedOptions));
+      } catch (error) {
+        console.error('Error parsing saved randomized options:', error);
+        // Fallback to generating new randomized options
+        const newRandomizedOptions = getRandomizedReferralOptions();
+        setRandomizedReferralOptions(newRandomizedOptions);
+        localStorage.setItem('randomizedReferralOptions', JSON.stringify(newRandomizedOptions));
+      }
+    } else {
+      // First time user, generate new randomized options
+      const newRandomizedOptions = getRandomizedReferralOptions();
+      setRandomizedReferralOptions(newRandomizedOptions);
+      localStorage.setItem('randomizedReferralOptions', JSON.stringify(newRandomizedOptions));
+    }
+    
+    // Add initial history entry to prevent going back to landing page
+    if (savedStep && parseInt(savedStep, 10) > 0) {
+      window.history.replaceState(null, '', '/onboarding');
+    }
+  }, [getRandomizedReferralOptions]);
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = (event) => {
+      const savedStep = localStorage.getItem('onboardingStep');
+      if (savedStep && parseInt(savedStep, 10) > 0) {
+        // Go back to the previous step instead of leaving onboarding
+        const previousStep = parseInt(savedStep, 10) - 1;
+        setCurrentStep(previousStep);
+        localStorage.setItem('onboardingStep', previousStep.toString());
+        
+        // Push a new state to keep the user on the onboarding page
+        window.history.pushState(null, '', '/onboarding');
+      }
+    };
+
+    // Add history entry when user starts onboarding (step > 0)
+    if (currentStep > 0) {
+      window.history.pushState(null, '', '/onboarding');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentStep]);
+
+  // Prevent navigation away from onboarding if user has progress
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      const savedStep = localStorage.getItem('onboardingStep');
+      if (savedStep && parseInt(savedStep, 10) > 0) {
+        event.preventDefault();
+        event.returnValue = 'You have unsaved progress in the onboarding. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   const getGradeColor = (grade) => {
     if (!grade) return '#6B7280'; // Gray for N/A
@@ -65,11 +198,46 @@ const Onboarding = () => {
       signOut().then(() => {
         localStorage.removeItem('onboardingData');
         localStorage.removeItem('userProfile');
+        localStorage.removeItem('onboardingStep');
+        localStorage.removeItem('randomizedReferralOptions');
       }).catch((error) => {
         console.error('Error logging out for onboarding:', error);
       });
     }
   }, [user, signOut]);
+
+  // Check if user is already authenticated and has a profile
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      // If user is authenticated and has a profile, redirect to dashboard
+      if (user && localStorage.getItem('userProfile')) {
+        navigate('/dashboard');
+        return;
+      }
+    };
+    
+    checkAuthStatus();
+  }, [user, navigate]);
+
+  // Cleanup function to clear onboarding data when component unmounts
+  useEffect(() => {
+    return () => {
+      // Only clear data if user is not completing the onboarding
+      // (completion is handled in the final button click)
+      const isCompleting = localStorage.getItem('onboardingStep') === '7' && 
+                          localStorage.getItem('onboardingData');
+      if (!isCompleting) {
+        // Keep the data for a short time in case user navigates back
+        setTimeout(() => {
+          if (!window.location.pathname.includes('/onboarding')) {
+            localStorage.removeItem('onboardingStep');
+            localStorage.removeItem('onboardingData');
+            localStorage.removeItem('randomizedReferralOptions');
+          }
+        }, 5000); // Clear after 5 seconds if not on onboarding page
+      }
+    };
+  }, []);
 
   const experienceOptions = [
     { value: 'beginner', label: 'Beginner', description: 'New to investing, learning the basics' },
@@ -83,56 +251,49 @@ const Onboarding = () => {
     { value: 'aggressive', label: 'Aggressive', description: 'Growth-focused, high risk tolerance' },
   ];
 
-  const referralOptions = [
-    { value: 'instagram', label: 'Instagram' },
-    { value: 'tiktok', label: 'TikTok' },
-    { value: 'friend_recommendation', label: 'Friend Recommendation' },
-    { value: 'search_engine', label: 'Search Engine' },
-    { value: 'blog_article', label: 'Blog/Article' },
-    { value: 'podcast', label: 'Podcast' },
-    { value: 'other', label: 'Other' },
-  ];
-
-  const benefits = [
-    {
-      title: "Smart Portfolio Analysis",
-      description: "Get AI-powered insights into your investment portfolio with detailed risk assessment and performance analysis.",
-      icon: <AnalyticsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
-    },
-    {
-      title: "Personalized Strategy",
-      description: "Receive tailored investment recommendations based on your risk tolerance, goals, and market conditions.",
-      icon: <InsightsIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
-    },
-    {
-      title: "Portfolio Stress Test",
-      description: "Test your portfolio against various market scenarios to understand potential risks and prepare for different economic conditions.",
-      icon: <TrendingUpIcon sx={{ fontSize: 40, color: '#8B5CF6' }} />
-    }
-  ];
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
+    const updatedFormData = {
       ...formData,
       [name]: value,
-    });
+    };
+    setFormData(updatedFormData);
+    
+    // Save form data to localStorage on every change
+    const dataToSave = {
+      ...updatedFormData,
+      // Don't save file-related data as it can't be serialized
+      screenshotFile: null,
+      screenshotPreview: null,
+      portfolioAnalysis: null,
+      analysisLoading: false,
+    };
+    localStorage.setItem('onboardingData', JSON.stringify(dataToSave));
   };
 
   const handleInterestChange = (interest) => {
     setFormData(prevData => {
       const isChecked = prevData.interests.includes(interest);
-      if (isChecked) {
-        return {
-          ...prevData,
-          interests: prevData.interests.filter(item => item !== interest)
-        };
-      } else {
-        return {
-          ...prevData,
-          interests: [...prevData.interests, interest]
-        };
-      }
+      const updatedData = isChecked ? {
+        ...prevData,
+        interests: prevData.interests.filter(item => item !== interest)
+      } : {
+        ...prevData,
+        interests: [...prevData.interests, interest]
+      };
+      
+      // Save form data to localStorage on every change
+      const dataToSave = {
+        ...updatedData,
+        // Don't save file-related data as it can't be serialized
+        screenshotFile: null,
+        screenshotPreview: null,
+        portfolioAnalysis: null,
+        analysisLoading: false,
+      };
+      localStorage.setItem('onboardingData', JSON.stringify(dataToSave));
+      
+      return updatedData;
     });
   };
 
@@ -289,12 +450,39 @@ const Onboarding = () => {
       await saveReferralSource();
     }
 
-    setCurrentStep(currentStep + 1);
+    // Save form data to localStorage before moving to next step
+    const dataToSave = {
+      ...formData,
+      // Don't save file-related data as it can't be serialized
+      screenshotFile: null,
+      screenshotPreview: null,
+      portfolioAnalysis: null,
+      analysisLoading: false,
+    };
+    localStorage.setItem('onboardingData', JSON.stringify(dataToSave));
+
+    const newStep = currentStep + 1;
+    setCurrentStep(newStep);
+    localStorage.setItem('onboardingStep', newStep.toString());
+    
+    // Update browser history for the new step
+    window.history.pushState(null, '', '/onboarding');
   };
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      const newStep = currentStep - 1;
+      setCurrentStep(newStep);
+      localStorage.setItem('onboardingStep', newStep.toString());
+      
+      // Update browser history to reflect the step change
+      if (newStep === 0) {
+        // If going back to first step, replace the current history entry
+        window.history.replaceState(null, '', '/onboarding');
+      } else {
+        // Push a new state for other steps
+        window.history.pushState(null, '', '/onboarding');
+      }
     }
   };
 
@@ -457,71 +645,84 @@ const Onboarding = () => {
             <Typography variant="h5" sx={{ fontWeight: 600, color: '#1F2937', mb: 3 }}>
               How did you hear about us?
             </Typography>
-            <FormControl fullWidth sx={{ mb: 4 }}>
-              <Select
+            <FormControl component="fieldset" sx={{ mt: 2, width: '100%' }}>
+              <RadioGroup
                 name="referralSource"
                 value={formData.referralSource}
                 onChange={handleInputChange}
-                displayEmpty
-                sx={{
-                  borderRadius: '12px',
-                  backgroundColor: '#ffffff',
-                  '& .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#E5E7EB',
-                  },
-                  '&:hover .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#D1D5DB',
-                  },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-                    borderColor: '#8B5CF6',
-                  },
-                }}
               >
-                <MenuItem value="" disabled>
-                  <em>Select an option</em>
-                </MenuItem>
-                {referralOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-              {formData.referralSource === 'other' && (
-                <TextField
-                  fullWidth
-                  label="Please specify"
-                  name="referralOther"
-                  value={formData.referralOther}
-                  onChange={handleInputChange}
-                  variant="outlined"
-                  sx={{
-                    mt: 2,
-                    '& .MuiOutlinedInput-root': {
+                {randomizedReferralOptions.map((option) => (
+                  <Paper
+                    key={option.value}
+                    sx={{
+                      mb: 2,
+                      p: 2,
+                      backgroundColor: formData.referralSource === option.value ? '#F3EBFF' : '#ffffff',
+                      border: '1px solid',
+                      borderColor: formData.referralSource === option.value ? '#8B5CF6' : '#E5E7EB',
                       borderRadius: '12px',
-                      backgroundColor: '#ffffff',
-                      '& fieldset': {
-                        borderColor: '#E5E7EB',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: '#D1D5DB',
-                      },
-                      '&.Mui-focused fieldset': {
+                      boxShadow: formData.referralSource === option.value ? '0 4px 12px rgba(139, 92, 246, 0.1)' : 'none',
+                      transition: 'all 0.2s ease-in-out',
+                      '&:hover': {
                         borderColor: '#8B5CF6',
-                      },
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#6B7280',
-                    },
-                    '& .MuiInputBase-input': {
-                      color: '#1F2937',
-                    }
-                  }}
-                />
-              )}
-              <FormHelperText sx={{ color: '#6B7280', mt: 1 }}>
-                This helps us improve our marketing and reach more investors.
-              </FormHelperText>
+                        boxShadow: '0 4px 12px rgba(139, 92, 246, 0.05)'
+                      }
+                    }}
+                  >
+                    <FormControlLabel
+                      value={option.value}
+                      control={<Radio sx={{ color: '#8B5CF6', '&.Mui-checked': { color: '#8B5CF6' } }} />}
+                      label={
+                        <Box>
+                          <Typography variant="body1" sx={{ fontWeight: 600, color: '#1F2937' }}>
+                            {option.label}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: '#6B7280' }}>
+                            {option.description}
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{ width: '100%', m: 0 }}
+                    />
+                  </Paper>
+                ))}
+              </RadioGroup>
             </FormControl>
+            {formData.referralSource === 'other' && (
+              <TextField
+                fullWidth
+                label="Please specify"
+                name="referralOther"
+                value={formData.referralOther}
+                onChange={handleInputChange}
+                variant="outlined"
+                sx={{
+                  mt: 2,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    backgroundColor: '#ffffff',
+                    '& fieldset': {
+                      borderColor: '#E5E7EB',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#D1D5DB',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#8B5CF6',
+                    },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6B7280',
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#1F2937',
+                  }
+                }}
+              />
+            )}
+            <FormHelperText sx={{ color: '#6B7280', mt: 1 }}>
+              This helps us improve our marketing and reach more investors.
+            </FormHelperText>
           </Box>
         );
 
@@ -669,7 +870,7 @@ const Onboarding = () => {
               Analyze Your Portfolio
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', mb: 4 }}>
-              Upload a screenshot of your current investment portfolio for a quick analysis.
+              Upload a screenshot of your current investment portfolio for a quick analysis. Take it straight from your broker like Robinhood, eToro, Trading 212, TradeRepublic, etc.
             </Typography>
             
             {!formData.screenshotFile ? (
@@ -965,6 +1166,9 @@ const Onboarding = () => {
                   setLoading(true);
                   try {
                     localStorage.setItem('onboardingData', JSON.stringify(formData));
+                    // Clear onboarding step since user is completing the flow
+                    localStorage.removeItem('onboardingStep');
+                    localStorage.removeItem('randomizedReferralOptions');
                     navigate('/registration');
                   } catch (error) {
                     console.error('Error saving profile:', error);

@@ -32,18 +32,9 @@ const openai = new OpenAI({
 
 console.log('OpenAI client initialized');
 
-// Configure multer for file uploads
+// Configure multer for file uploads - use memory storage for Vercel
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      // Use a cross-platform temp directory
-      const os = require('os');
-      cb(null, os.tmpdir());
-    },
-    filename: (req, file, cb) => {
-      cb(null, `${uuidv4()}-${file.originalname}`);
-    },
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
 });
 
@@ -186,8 +177,8 @@ module.exports = async function handler(req, res) {
 
     const imageContents = [];
     for (const file of req.files) {
-        console.log('Processing file:', file.path);
-        const imageBuffer = await fs.readFile(file.path);
+        console.log('Processing file from memory:', file.originalname);
+        const imageBuffer = file.buffer;
         const base64Image = imageBuffer.toString('base64');
         imageContents.push({
             type: "image_url",
@@ -197,15 +188,7 @@ module.exports = async function handler(req, res) {
         });
     }
 
-    // Clean up the files
-    for (const file of req.files) {
-        try {
-            await fs.unlink(file.path);
-            console.log(`Temporary file cleaned up: ${file.path}`);
-        } catch (cleanupError) {
-            console.warn(`Could not delete temporary file: ${file.path}`, cleanupError);
-        }
-    }
+    // No cleanup needed for memory storage
 
     console.log('Calling OpenAI API...');
 
